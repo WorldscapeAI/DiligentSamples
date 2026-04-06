@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   precheks:
     name:    Linux -> Pre-checks
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Clone DiligentCore
@@ -35,7 +35,7 @@ jobs:
 
   build:
     needs:   precheks
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
@@ -47,30 +47,30 @@ jobs:
         include:
           - name:            "GCC"
             cmake_generator: "Unix Makefiles"
-            cc:              "gcc-9"
-            cxx:             "g++-9"
+            cc:              "gcc-14"
+            cxx:             "g++-14"
 
           - name:            "Clang"
             cmake_generator: "Ninja"
-            cc:              "clang-12"
-            cxx:             "clang++-12"
+            cc:              "clang-18"
+            cxx:             "clang++-18"
 
     name: Linux -> ${{ matrix.name }}-x64, ${{ matrix.build_type }}
 
     steps:
     - name: Checkout
-      uses: DiligentGraphics/github-action/checkout@v1
+      uses: DiligentGraphics/github-action/checkout@v10
 
     - name: Set up build environment
       if:   success()
-      uses: DiligentGraphics/github-action/setup-build-env@v1
+      uses: DiligentGraphics/github-action/setup-build-env@v10
       with:
         platform:        Linux
         cmake-generator: ${{ matrix.cmake_generator }}
 
     - name: Configure CMake
       if:   success()
-      uses: DiligentGraphics/github-action/configure-cmake@v1
+      uses: DiligentGraphics/github-action/configure-cmake@v10
       with:
         cc:         ${{ matrix.cc }}
         cxx:        ${{ matrix.cxx }}
@@ -81,28 +81,36 @@ jobs:
     - name: Build
       id:   build
       if:   success()
-      uses: DiligentGraphics/github-action/build@v1
+      uses: DiligentGraphics/github-action/build@v10
 
     - name: Sample Tests Vk
       if:   success()
-      uses: DiligentGraphics/github-action/run-sample-tests@v1
+      uses: DiligentGraphics/github-action/run-sample-tests@v10
       with:
         mode:              "vk_sw"
         golden-image-mode: "compare_update"
 
+    - name: Sample Tests Vk Compatibility
+      if:   success()
+      uses: DiligentGraphics/github-action/run-sample-tests@v10
+      with:
+        mode:              "vk_sw"
+        golden-image-mode: "compare"
+        vk-compatibility: true
+
     - name: Sample Tests GL
       if:    ${{ success() || failure() && steps.build.outcome == 'success' }}
-      uses: DiligentGraphics/github-action/run-sample-tests@v1
+      uses: DiligentGraphics/github-action/run-sample-tests@v10
       with:
         mode:              "gl"
         golden-image-mode: "compare_update"
 
     - name: Sample Tests GL with Non-Separable Programs
       if:    ${{ success() || failure() && steps.build.outcome == 'success' }}
-      uses: DiligentGraphics/github-action/run-sample-tests@v1
+      uses: DiligentGraphics/github-action/run-sample-tests@v10
       with:
         mode:                "gl"
-        golden-image-mode:   "compare_update"
+        golden-image-mode:   "compare"
         non-separable-progs: "true"
 
 

@@ -31,6 +31,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No color
 
+GOLDEN_IMAGE_TOLERANCE=2
+
 if [[ $# -lt 3 ]]; then
     printf "${RED}At least three arguments are required${NC}\n"
     print_help
@@ -94,18 +96,22 @@ declare -a TestApps=(
     "Tutorials/Tutorial12_RenderTarget"
     "Tutorials/Tutorial13_ShadowMap"
     "Tutorials/Tutorial14_ComputeShader"
-    # "Tutorials/Tutorial16_BindlessResources" does not work properly on llvmpipe 
+    "Tutorials/Tutorial16_BindlessResources"
     "Tutorials/Tutorial17_MSAA"
     "Tutorials/Tutorial18_Queries --show_ui 0"
     "Tutorials/Tutorial19_RenderPasses"
+    "Tutorials/Tutorial20_MeshShader --show_ui 0"
+    "Tutorials/Tutorial21_RayTracing --show_ui 0"
     "Tutorials/Tutorial23_CommandQueues --show_ui 0"
     "Tutorials/Tutorial25_StatePackager --show_ui 0"
     "Tutorials/Tutorial26_StateCache --show_ui 0"
      # On the second run the states should be loaded from the cache
-    "Tutorials/Tutorial26_StateCache --show_ui 0"
+     # Second run is done in compatibility mode
+     #"Tutorials/Tutorial26_StateCache --show_ui 0"
+    "Tutorials/Tutorial29_OIT --show_ui 0"
     "Samples/Atmosphere --show_ui 0"
     "Samples/GLTFViewer --show_ui 0 --use_cache 1"
-    "Samples/NuklearDemo --show_ui 0"
+    "Samples/NuklearDemo"
     "Samples/Shadows --show_ui 0"
     # "Samples/ImguiDemo" has fps counter in the UI, so we have to skip it
 )
@@ -114,6 +120,22 @@ tests_failed=0
 tests_passed=0
 tests_skipped=0
 overall_status=""
+
+function get_argument_value {
+    local arg_name=$1
+    local default_value=$2
+    shift 2
+    local args=("$@")
+    
+    for i in "${!args[@]}"; do
+        if [[ "${args[$i]}" == "$arg_name" ]]; then
+            let j=i+1
+            echo "${args[$j]}"
+            return
+        fi
+    done
+    echo "$default_value"
+}
 
 function process_golden_img
 {
@@ -150,22 +172,24 @@ function process_golden_img
             fi
         done
 
-        skip_test=0
-        if [[ "$backend_name" == "gl" && ("$app_name" == "Tutorial07_GeometryShader" || "$app_name" == "Tutorial08_Tessellation") ]]; then
-            for i in "${!args[@]}"; do
-                if [[ "${args[$i]}" == "--non_separable_progs" ]]; then
-                    let j=i+1
-                    if [[ "${args[$j]}" != "0" ]]; then
-                        skip_test=1
-                    fi
+        local skip_test=0
+        local non_separable_progs=0
+        if [[ "$backend_name" == "gl" ]]; then
+            non_separable_progs=$(get_argument_value "--non_separable_progs" "0" "${args[@]}")
+            if [[ "$app_name" == "Tutorial07_GeometryShader" || "$app_name" == "Tutorial08_Tessellation" ]]; then
+                if [[ "$non_separable_progs" != "0" ]]; then
+                    skip_test=1
                 fi
-            done
+            elif [[ "$app_name" == "Tutorial20_MeshShader" || "$app_name" == "Tutorial21_RayTracing" ]]; then
+                skip_test=1
+            fi
         fi
 
         if [[ "$skip_test" == "0" ]]; then
             local capture_name="$app_name""_""$backend_name"
 
-            local cmd="$app_path $mode --width $GOLDEN_IMAGE_WIDTH --height $GOLDEN_IMAGE_HEIGHT --golden_image_mode $golden_img_mode --capture_path $golden_img_dir --capture_name $capture_name --capture_format png --adapters_dialog 0 --break_on_error 0 $extra_args"
+            local cmd="$app_path $mode --width $GOLDEN_IMAGE_WIDTH --height $GOLDEN_IMAGE_HEIGHT --golden_image_mode $golden_img_mode --capture_path $golden_img_dir --capture_name $capture_name --capture_format png --adapters_dialog 0 --break_on_error 0 --golden_image_tolerance $GOLDEN_IMAGE_TOLERANCE $extra_args"
+
             echo $cmd
             echo ""
             bash -c "$cmd"

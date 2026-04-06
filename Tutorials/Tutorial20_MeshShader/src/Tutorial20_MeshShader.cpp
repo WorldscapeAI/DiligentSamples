@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +25,7 @@
  *  of the possibility of such damages.
  */
 
-#include <array>
+#include <vector>
 
 #include "Tutorial20_MeshShader.hpp"
 #include "MapHelper.hpp"
@@ -36,7 +36,6 @@
 #include "ImGuiUtils.hpp"
 #include "FastRand.hpp"
 #include "AdvancedMath.hpp"
-#include "../../Common/src/TexturedCube.hpp"
 
 namespace Diligent
 {
@@ -61,24 +60,36 @@ SampleBase* CreateSample()
 
 void Tutorial20_MeshShader::CreateCube()
 {
-    // Pack float3 positions into float4 vectors
-    std::array<float4, TexturedCube::NumVertices> CubePos{};
-    for (Uint32 v = 0; v < TexturedCube::NumVertices; ++v)
-        CubePos[v] = TexturedCube::Positions[v];
+    RefCntAutoPtr<IDataBlob> pCubeVerts;
+    RefCntAutoPtr<IDataBlob> pCubeIndices;
+    GeometryPrimitiveInfo    CubeGeoInfo;
+    constexpr float          CubeSize = 2.f;
+    CreateGeometryPrimitive(CubeGeometryPrimitiveAttributes{CubeSize, GEOMETRY_PRIMITIVE_VERTEX_FLAG_POS_TEX}, &pCubeVerts, &pCubeIndices, &CubeGeoInfo);
 
-    // Pack float2 texcoords into float4 vectors
-    std::array<float4, TexturedCube::NumVertices> CubeUV{};
-    for (Uint32 v = 0; v < TexturedCube::NumVertices; ++v)
+    struct CubeVertex
     {
-        const auto& UV{TexturedCube::Texcoords[v]};
-        CubeUV[v] = {UV.x, UV.y, 0, 0};
+        float3 Pos;
+        float2 UV;
+    };
+    VERIFY_EXPR(CubeGeoInfo.VertexSize == sizeof(CubeVertex));
+    const CubeVertex* pVerts   = pCubeVerts->GetConstDataPtr<CubeVertex>();
+    const Uint32*     pIndices = pCubeIndices->GetConstDataPtr<Uint32>();
+
+    // Pack float3 positions into float4 vectors
+    // Pack float2 texcoords into float4 vectors
+    std::vector<float4> CubePos(CubeGeoInfo.NumVertices);
+    std::vector<float4> CubeUV(CubeGeoInfo.NumVertices);
+    for (Uint32 v = 0; v < CubeGeoInfo.NumVertices; ++v)
+    {
+        CubePos[v] = float4{pVerts[v].Pos, 1};
+        CubeUV[v]  = float4{pVerts[v].UV, 0, 0};
     }
 
     // Pack each triangle indices into uint4
-    std::array<uint4, TexturedCube::NumIndices / 3> Indices{};
+    std::vector<uint4> Indices(CubeGeoInfo.NumIndices / 3);
     for (size_t tri = 0; tri < Indices.size(); ++tri)
     {
-        const auto* src_ind{&TexturedCube::Indices[tri * 3]};
+        const Uint32* src_ind{&pIndices[tri * 3]};
         Indices[tri] = {src_ind[0], src_ind[1], src_ind[2], 0};
     }
     CubeData Data;
@@ -122,8 +133,8 @@ void Tutorial20_MeshShader::CreateDrawTasks()
     {
         for (int x = 0; x < GridDim.x; ++x)
         {
-            int   idx = x + y * GridDim.x;
-            auto& dst = DrawTasks[idx];
+            int       idx = x + y * GridDim.x;
+            DrawTask& dst = DrawTasks[idx];
 
             dst.BasePos.x  = (x - GridDim.x / 2) * 4.f + (Rnd() * 2.f - 1.f);
             dst.BasePos.y  = (y - GridDim.y / 2) * 4.f + (Rnd() * 2.f - 1.f);
@@ -353,8 +364,8 @@ void Tutorial20_MeshShader::Initialize(const SampleInitInfo& InitInfo)
 // Render a frame
 void Tutorial20_MeshShader::Render()
 {
-    auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
-    auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
+    ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+    ITextureView* pDSV = m_pSwapChain->GetDepthBufferDSV();
     // Clear the back buffer
     const float ClearColor[] = {0.350f, 0.350f, 0.350f, 1.0f};
     m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
@@ -435,10 +446,9 @@ void Tutorial20_MeshShader::Render()
     }
 }
 
-void Tutorial20_MeshShader::Update(double CurrTime, double ElapsedTime)
+void Tutorial20_MeshShader::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     // Set world view matrix
     if (m_Animate)
@@ -455,10 +465,10 @@ void Tutorial20_MeshShader::Update(double CurrTime, double ElapsedTime)
     float4x4 View = float4x4::Translation(0.f, -4.0f, m_CameraHeight);
 
     // Get pretransform matrix that rotates the scene according the surface orientation
-    auto SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
+    float4x4 SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
 
     // Get projection matrix adjusted to the current screen orientation
-    auto Proj = GetAdjustedProjectionMatrix(m_FOV, 1.f, 1000.f);
+    float4x4 Proj = GetAdjustedProjectionMatrix(m_FOV, 1.f, 1000.f);
 
     // Compute view and view-projection matrices
     m_ViewMatrix     = RotationMatrix * View * SrfPreTransform;

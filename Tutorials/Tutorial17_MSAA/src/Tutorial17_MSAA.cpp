@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,7 +57,7 @@ void Tutorial17_MSAA::CreateCubePSO()
     CubePsoCI.pShaderSourceFactory = pShaderSourceFactory;
     CubePsoCI.VSFilePath           = "cube.vsh";
     CubePsoCI.PSFilePath           = "cube.psh";
-    CubePsoCI.Components           = TexturedCube::VERTEX_COMPONENT_FLAG_POS_UV;
+    CubePsoCI.Components           = GEOMETRY_PRIMITIVE_VERTEX_FLAG_POS_TEX;
     CubePsoCI.SampleCount          = m_SampleCount;
 
     m_pCubePSO = TexturedCube::CreatePipelineState(CubePsoCI, m_ConvertPSOutputToGamma);
@@ -107,9 +107,9 @@ void Tutorial17_MSAA::Initialize(const SampleInitInfo& InitInfo)
 {
     SampleBase::Initialize(InitInfo);
 
-    const auto& ColorFmtInfo = m_pDevice->GetTextureFormatInfoExt(m_pSwapChain->GetDesc().ColorBufferFormat);
-    const auto& DepthFmtInfo = m_pDevice->GetTextureFormatInfoExt(DepthBufferFormat);
-    m_SupportedSampleCounts  = ColorFmtInfo.SampleCounts & DepthFmtInfo.SampleCounts;
+    const TextureFormatInfoExt& ColorFmtInfo = m_pDevice->GetTextureFormatInfoExt(m_pSwapChain->GetDesc().ColorBufferFormat);
+    const TextureFormatInfoExt& DepthFmtInfo = m_pDevice->GetTextureFormatInfoExt(DepthBufferFormat);
+    m_SupportedSampleCounts                  = ColorFmtInfo.SampleCounts & DepthFmtInfo.SampleCounts;
     if (m_SupportedSampleCounts & SAMPLE_COUNT_4)
         m_SampleCount = 4;
     else if (m_SupportedSampleCounts & SAMPLE_COUNT_2)
@@ -125,7 +125,7 @@ void Tutorial17_MSAA::Initialize(const SampleInitInfo& InitInfo)
     CreateUniformBuffer(m_pDevice, sizeof(float4x4), "VS constants CB", &m_CubeVSConstants);
 
     // Load textured cube
-    m_CubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, TexturedCube::VERTEX_COMPONENT_FLAG_POS_UV);
+    m_CubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, GEOMETRY_PRIMITIVE_VERTEX_FLAG_POS_TEX);
     m_CubeIndexBuffer  = TexturedCube::CreateIndexBuffer(m_pDevice);
     m_CubeTextureSRV   = TexturedCube::LoadTexture(m_pDevice, "DGLogo.png")->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
 
@@ -142,7 +142,7 @@ void Tutorial17_MSAA::CreateMSAARenderTarget()
     if (m_SampleCount == 1)
         return;
 
-    const auto& SCDesc = m_pSwapChain->GetDesc();
+    const SwapChainDesc& SCDesc = m_pSwapChain->GetDesc();
     // Create window-size multi-sampled offscreen render target
     TextureDesc ColorDesc;
     ColorDesc.Name           = "Multisampled render target";
@@ -260,7 +260,7 @@ void Tutorial17_MSAA::Render()
     if (m_SampleCount > 1)
     {
         // Resolve multi-sampled render target into the current swap chain back buffer.
-        auto pCurrentBackBuffer = m_pSwapChain->GetCurrentBackBufferRTV()->GetTexture();
+        ITexture* pCurrentBackBuffer = m_pSwapChain->GetCurrentBackBufferRTV()->GetTexture();
 
         ResolveTextureSubresourceAttribs ResolveAttribs;
         ResolveAttribs.SrcTextureTransitionMode = RESOURCE_STATE_TRANSITION_MODE_TRANSITION;
@@ -269,10 +269,9 @@ void Tutorial17_MSAA::Render()
     }
 }
 
-void Tutorial17_MSAA::Update(double CurrTime, double ElapsedTime)
+void Tutorial17_MSAA::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     if (m_bRotateGrid)
         m_fCurrentTime += static_cast<float>(ElapsedTime);
@@ -283,10 +282,10 @@ void Tutorial17_MSAA::Update(double CurrTime, double ElapsedTime)
     float4x4 View = float4x4::Translation(0.0f, 0.0f, 30.0f);
 
     // Get pretransform matrix that rotates the scene according the surface orientation
-    auto SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
+    float4x4 SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
 
     // Get projection matrix adjusted to the current screen orientation
-    auto Proj = GetAdjustedProjectionMatrix(PI_F / 4.0f, 0.1f, 100.f);
+    float4x4 Proj = GetAdjustedProjectionMatrix(PI_F / 4.0f, 0.1f, 100.f);
 
     // Compute world-view-projection matrix
     m_WorldViewProjMatrix = Model * View * SrfPreTransform * Proj;

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,9 +40,12 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "Tutorial20: Mesh shader"; }
+
+protected:
+    virtual void UpdateUI() override final;
 
 private:
     void CreatePipelineState();
@@ -51,7 +54,6 @@ private:
     void CreateStatisticsBuffer();
     void CreateConstantsBuffer();
     void LoadTexture();
-    void UpdateUI();
 
     RefCntAutoPtr<IBuffer>      m_CubeBuffer;
     RefCntAutoPtr<ITextureView> m_CubeTextureSRV;

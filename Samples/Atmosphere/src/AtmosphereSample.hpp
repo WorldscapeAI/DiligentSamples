@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,13 +47,15 @@ public:
 
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
     virtual void WindowResize(Uint32 Width, Uint32 Height) override final;
 
     virtual const Char* GetSampleName() const override final { return "Atmosphere Sample"; }
 
+protected:
+    virtual void UpdateUI() override final;
+
 private:
-    void UpdateUI();
     void CreateShadowMap();
     void RenderShadowMap(IDeviceContext* pContext,
                          LightAttribs&   LightAttribs,

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,18 +44,20 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "Tutorial19: Render Passes"; }
 
-    virtual void PreWindowResize() override final;
+    virtual void ReleaseSwapChainBuffers() override final;
     virtual void WindowResize(Uint32 Width, Uint32 Height) override final;
+
+protected:
+    virtual void UpdateUI() override final;
 
 private:
     void CreateCubePSO(IShaderSourceInputStreamFactory* pShaderSourceFactory);
     void CreateLightVolumePSO(IShaderSourceInputStreamFactory* pShaderSourceFactory);
     void CreateAmbientLightPSO(IShaderSourceInputStreamFactory* pShaderSourceFactory);
-    void UpdateUI();
     void CreateRenderPass();
     void DrawScene();
     void ApplyLighting();

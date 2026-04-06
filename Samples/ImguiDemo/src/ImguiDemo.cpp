@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2023 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,9 +91,9 @@ void ImguiDemo::UpdateUI()
 // Render a frame
 void ImguiDemo::Render()
 {
-    auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+    ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
 
-    auto ClearColor = m_ClearColor;
+    float4 ClearColor = m_ClearColor;
     if (!m_ConvertPSOutputToGamma)
     {
         // ImGui defines color in gamma space, so we need to convert it to linear.
@@ -103,11 +103,9 @@ void ImguiDemo::Render()
 }
 
 
-void ImguiDemo::Update(double CurrTime, double ElapsedTime)
+void ImguiDemo::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 }
 
 void ImguiDemo::WindowResize(Uint32 Width, Uint32 Height)

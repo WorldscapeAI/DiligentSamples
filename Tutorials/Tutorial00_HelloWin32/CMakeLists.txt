@@ -12,10 +12,11 @@ target_include_directories(Tutorial00_HelloWin32 PRIVATE "../../../DiligentCore"
 target_compile_definitions(Tutorial00_HelloWin32 PRIVATE UNICODE)
 
 set_target_properties(Tutorial00_HelloWin32 PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
     FOLDER DiligentSamples/Tutorials
 )
 
-target_compile_definitions(Tutorial00_HelloWin32 PRIVATE ENGINE_DLL=1)
 target_link_libraries(Tutorial00_HelloWin32 PRIVATE Diligent-BuildSettings)
 
 if(D3D11_SUPPORTED)

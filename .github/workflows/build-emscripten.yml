@@ -6,11 +6,11 @@ jobs:
   build:
     strategy:
       matrix:
-        os:         ["windows-latest", "ubuntu-20.04", "macos-14"]
+        os:         ["windows-latest", "ubuntu-24.04", "macos-15"]
         build_type: ["Debug", "Release"]
         exclude:
           # Exclude MacOS-Release
-          - os:         "macos-14"
+          - os:         "macos-15"
             build_type: "Release"
 
         include:
@@ -25,11 +25,11 @@ jobs:
             host_name:  "Win10"
             cmake_args: "-DDILIGENT_EMSCRIPTEN_STRIP_DEBUG_INFO=ON"
 
-          - os:        "ubuntu-20.04"
+          - os:        "ubuntu-24.04"
             host_name: "Linux"
             cmake_args: "-DDILIGENT_EMSCRIPTEN_STRIP_DEBUG_INFO=ON"
 
-          - os:        "macos-14"
+          - os:        "macos-15"
             host_name: "MacOS"
             cmake_args: "-DDILIGENT_EMSCRIPTEN_STRIP_DEBUG_INFO=ON"
 
@@ -38,21 +38,21 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: DiligentGraphics/github-action/checkout@v1
+      uses: DiligentGraphics/github-action/checkout@v10
 
     - name: Set up build environment
       if:   success()
-      uses: DiligentGraphics/github-action/setup-build-env@v1
+      uses: DiligentGraphics/github-action/setup-build-env@v10
       with:
-        platform: Emscripten
+        platform: Web
 
     - name: Configure CMake
       if:   success()
-      uses: DiligentGraphics/github-action/configure-cmake@v1
+      uses: DiligentGraphics/github-action/configure-cmake@v10
       with:
         build-type: ${{ matrix.build_type }}
         cmake-args: ${{ matrix.cmake_args }}
 
     - name: Build
       if:   success()
-      uses: DiligentGraphics/github-action/build@v1
+      uses: DiligentGraphics/github-action/build@v10

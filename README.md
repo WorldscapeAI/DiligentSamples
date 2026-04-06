@@ -1,4 +1,4 @@
-# DiligentSamples <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/diligentgraphics-logo.png" height=64 align="right" valign="middle">
+# Diligent Samples <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/diligentgraphics-logo.png" height=64 align="right" valign="middle">
 
 
 This module contains tutorials and sample applications intended to demonstrate the usage of
@@ -6,7 +6,8 @@ This module contains tutorials and sample applications intended to demonstrate t
 the [Core](https://github.com/DiligentGraphics/DiligentCore), [Tools](https://github.com/DiligentGraphics/DiligentTools),
 and [FX](https://github.com/DiligentGraphics/DiligentFX) submodules.
 
-To build and run the applications in the module, please follow the [instructions](https://github.com/DiligentGraphics/DiligentEngine#build-and-run-instructions) in the master repository.
+To build and run the applications, please clone the [main repository](https://github.com/DiligentGraphics/DiligentEngine?tab=readme-ov-file#cloning-the-repository)
+and follow the [instructions](https://github.com/DiligentGraphics/DiligentEngine#build-and-run-instructions).
 
 | Platform                                                                                                                                    |   Build Status                    |
 | --------------------------------------------------------------------------------------------------------------------------------------------| --------------------------------- |
@@ -17,13 +18,14 @@ To build and run the applications in the module, please follow the [instructions
 | <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/macos-logo.png" width=24 valign="middle"> MacOS                | [![Build Status](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-apple.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-apple.yml?query=branch%3Amaster) |
 | <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/apple-logo.png" width=24 valign="middle"> iOS                  | [![Build Status](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-apple.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-apple.yml?query=branch%3Amaster) |
 | <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/tvos-logo.png" width=24 valign="middle"> tvOS                  | [![Build Status](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-apple.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-apple.yml?query=branch%3Amaster) |
-| <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/emscripten-logo.png" width=24 valign="middle"> Emscripten      | [![Build Status](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-emscripten.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-emscripten.yml?query=branch%3Amaster) | 
+| <img src="https://github.com/DiligentGraphics/DiligentCore/blob/master/media/emscripten-logo.png" width=24 valign="middle"> Web             | [![Build Status](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-emscripten.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/build-emscripten.yml?query=branch%3Amaster) | 
 
+[![Documentation](https://img.shields.io/badge/Documentation-online-0072B1?logo=readthedocs&logoColor=white)](https://diligentgraphics.github.io/docs)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](License.txt)
 [![Chat on Discord](https://img.shields.io/discord/730091778081947680?logo=discord)](https://discord.gg/t7HGBK7)
-[![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/github/DiligentGraphics/DiligentSamples?svg=true)](https://ci.appveyor.com/project/DiligentGraphics/diligentsamples)
-[![MSVC Code Analysis](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/msvc_analysis.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/msvc_analysis.yml?query=branch%3Amaster)
 [![Lines of code](https://sloc.xyz/github/DiligentGraphics/DiligentSamples)](https://github.com/DiligentGraphics/DiligentSamples)
+[![Appveyor Build Status](https://img.shields.io/appveyor/build/DiligentGraphics/diligentsamples/master?logo=appveyor)](https://ci.appveyor.com/project/DiligentGraphics/diligentsamples)
+[![MSVC Code Analysis](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/msvc_analysis.yml/badge.svg?branch=master)](https://github.com/DiligentGraphics/DiligentSamples/actions/workflows/msvc_analysis.yml?query=branch%3Amaster)
 
 # Table of Contents
 
@@ -57,6 +59,8 @@ To build and run the applications in the module, please follow the [instructions
   - [25 - Render State Packager](#tutorial-25---render-state-packager)
   - [26 - Render State Cache](#tutorial-26---render-state-cache)
   - [27 - Post-Processing](#tutorial-27---post-processing)
+  - [28 - Hello-OpenXR](#tutorial-28---hello-openxr)
+  - [29 - OIT](#tutorial-29---oit)
 - [Samples](#samples)
   - [Atmospheric Light Scattering](#atmospheric-light-scattering-sample)
   - [GLFW Demo](#glfw-demo)
@@ -325,6 +329,20 @@ This tutorial demonstrates how to use post-processing effects from the DiligentF
 [:arrow_forward: Run in the browser](https://diligentgraphics.github.io/wasm-modules/Tutorial27_PostProcessing/Tutorial27_PostProcessing.html)
 
 
+## [Tutorial 28 - Hello OpenXR](https://github.com/DiligentGraphics/DiligentSamples/tree/master/Tutorials/Tutorial28_HelloOpenXR)
+
+This tutorial demonstrates how to use Diligent Engine with OpenXR API to render a simple scene in a VR headset.
+
+
+## [Tutorial 29 - OIT](https://github.com/DiligentGraphics/DiligentSamples/tree/master/Tutorials/Tutorial29_OIT)
+
+![](Tutorials/Tutorial29_OIT/Screenshot.jpg)
+
+This tutorial demonstrates how to implement order-independent transparency (OIT) methods to render transparent objects without sorting.
+
+[:arrow_forward: Run in the browser](https://diligentgraphics.github.io/wasm-modules/Tutorial29_OIT/Tutorial29_OIT.html)
+
+
 # Samples
 
 ## [Atmospheric Light Scattering sample](Samples/Atmosphere)
@@ -347,7 +365,7 @@ This simple maze mini-game demonstrates how to use GLFW to create window and han
 
 ## [GLTF Viewer](Samples/GLTFViewer)
 
-|||
+| | |
 |-----------------|-----------------|
 | ![](https://github.com/DiligentGraphics/DiligentFX/blob/master/PBR/screenshots/damaged_helmet.jpg) | ![](https://github.com/DiligentGraphics/DiligentFX/blob/master/PBR/screenshots/flight_helmet.jpg) |
 | ![](https://github.com/DiligentGraphics/DiligentFX/blob/master/PBR/screenshots/mr_spheres.jpg)     | ![](Samples/GLTFViewer/screenshots/cesium_man_large.gif)  |
@@ -389,7 +407,7 @@ This sample demonstrates the integration of the engine with [dear imgui](https:/
 
 ![](Samples/NuklearDemo/Screenshot.png)
 
-This sample demonstrates the integration of the engine with [nuklear](https://github.com/vurtun/nuklear) UI library.
+This sample demonstrates the integration of the engine with [nuklear](https://github.com/Immediate-Mode-UI/Nuklear) UI library.
 
 
 ## [Hello AR](Android/HelloAR)
@@ -460,7 +478,7 @@ See [Apache 2.0 license](License.txt).
 
 This project has some third-party dependencies, each of which may have independent licensing:
 
-* [nuklear](https://github.com/vurtun/nuklear): A single-header ANSI C gui library ([MIT or Public domain license](https://github.com/DiligentGraphics/nuklear/blob/master/Readme.md)).
+* [nuklear](https://github.com/Immediate-Mode-UI/Nuklear): A single-header ANSI C gui library ([MIT or Public domain license](https://github.com/DiligentGraphics/NuklearUI/blob/master/LICENSE)).
 * [glfw](https://github.com/glfw/glfw): A multi-platform library for OpenGL, OpenGL ES, Vulkan, window and input ([zlib License](https://github.com/DiligentGraphics/glfw/blob/master/LICENSE.md)).
 * [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Immediate mode 3D gizmo for scene editing and other controls based on Dear Imgui ([MIT](https://github.com/CedricGuillemet/ImGuizmo/blob/master/LICENSE)).
 

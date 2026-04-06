@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,7 +42,7 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "Tutorial16: Bindless Resources"; }
 
@@ -53,12 +53,14 @@ public:
         Uint32 BaseVertex = 0;
     };
 
+protected:
+    virtual void UpdateUI() override final;
+
 private:
     void CreatePipelineState();
     void CreateGeometryBuffers();
     void CreateInstanceBuffer();
     void LoadTextures();
-    void UpdateUI();
     void PopulateInstanceBuffer();
 
     static constexpr int        NumTextures = 4;
@@ -80,7 +82,7 @@ private:
         float4x4 Matrix;
         uint     TextureInd = 0;
     };
-    std::vector<InstanceData> m_InstanceData;
+    std::vector<InstanceData> m_Instances;
     std::vector<Uint32>       m_GeometryType;
 
     float4x4 m_ViewProjMatrix;

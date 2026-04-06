@@ -1,5 +1,5 @@
 /*
- *  Copyright 2024 Diligent Graphics LLC
+ *  Copyright 2024-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -65,39 +65,28 @@ public:
 
     void Render() override final;
 
-    void Update(double CurrTime, double ElapsedTime) override final;
+    void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     void WindowResize(Uint32 Width, Uint32 Height) override final;
 
     const Char* GetSampleName() const override final { return "Tutorial27: Post Processing"; }
 
+protected:
+    virtual void UpdateUI() override final;
+    virtual void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override final;
+
 private:
     void PrepareResources();
-
     void GenerateGeometry();
-
     void ComputePostFX();
-
     void ComputeSSR();
-
     void ComputeSSAO();
-
     void ComputeLighting();
-
     void ComputeTAA();
-
     void ComputeBloom();
-
     void ComputeToneMapping();
-
     void ComputeFSR();
-
     void ComputeGammaCorrection();
-
-    void UpdateUI();
-
-    void ModifyEngineInitInfo(const ModifyEngineInitInfoAttribs& Attribs) override;
-
     void LoadEnvironmentMap(const char* FileName);
 
 private:

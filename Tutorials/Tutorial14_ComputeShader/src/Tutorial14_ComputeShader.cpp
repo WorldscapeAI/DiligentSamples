@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,7 +86,7 @@ void Tutorial14_ComputeShader::CreateRenderParticlePSO()
     PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = False;
     // clang-format on
 
-    auto& BlendDesc = PSOCreateInfo.GraphicsPipeline.BlendDesc;
+    BlendStateDesc& BlendDesc = PSOCreateInfo.GraphicsPipeline.BlendDesc;
 
     BlendDesc.RenderTargets[0].BlendEnable = True;
     BlendDesc.RenderTargets[0].SrcBlend    = BLEND_FACTOR_SRC_ALPHA;
@@ -273,7 +273,7 @@ void Tutorial14_ComputeShader::CreateParticleBuffers()
     constexpr float fMaxParticleSize = 0.05f;
     float           fSize            = 0.7f / std::sqrt(static_cast<float>(m_NumParticles));
     fSize                            = std::min(fMaxParticleSize, fSize);
-    for (auto& particle : ParticleData)
+    for (ParticleAttribs& particle : ParticleData)
     {
         particle.f2NewPos.x   = pos_distr(gen);
         particle.f2NewPos.y   = pos_distr(gen);
@@ -367,8 +367,8 @@ void Tutorial14_ComputeShader::Initialize(const SampleInitInfo& InitInfo)
 // Render a frame
 void Tutorial14_ComputeShader::Render()
 {
-    auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
-    auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
+    ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+    ITextureView* pDSV = m_pSwapChain->GetDepthBufferDSV();
     // Clear the back buffer
     float4 ClearColor = {0.350f, 0.350f, 0.350f, 1.0f};
     if (m_ConvertPSOutputToGamma)
@@ -433,10 +433,9 @@ void Tutorial14_ComputeShader::Render()
     m_pImmediateContext->Draw(drawAttrs);
 }
 
-void Tutorial14_ComputeShader::Update(double CurrTime, double ElapsedTime)
+void Tutorial14_ComputeShader::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     m_fTimeDelta = static_cast<float>(ElapsedTime);
 }

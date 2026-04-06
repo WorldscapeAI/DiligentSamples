@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,7 +44,7 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "Nuklear Demo"; }
 
@@ -53,9 +53,10 @@ public:
     virtual bool HandleNativeMessage(const void* pNativeMsgData) override final;
 #endif
 
-private:
-    void UpdateUI();
+protected:
+    virtual void UpdateUI() override final;
 
+private:
     nk_diligent_context* m_pNkDlgCtx = nullptr;
     nk_context*          m_pNkCtx    = nullptr;
 };

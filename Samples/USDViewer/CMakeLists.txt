@@ -43,7 +43,13 @@ set(ASSETS
     ${USD_ASSETS}
 )
 
-add_sample_app("USDViewer" "DiligentSamples/Samples" "${SOURCE}" "${INCLUDE}" "${SHADERS}" "${ASSETS}")
+add_sample_app(USDViewer
+    IDE_FOLDER DiligentSamples/Samples
+    SOURCES ${SOURCE}
+    INCLUDES ${INCLUDE}
+    SHADERS ${SHADERS} 
+    ASSETS ${ASSETS}
+)
 
 set_source_files_properties(${USD_ASSETS} PROPERTIES
     VS_DEPLOYMENT_LOCATION "usd"
@@ -81,8 +87,13 @@ target_link_libraries(USDViewer
 PRIVATE
     Diligent-Hydrogent
     DiligentFX
+    Diligent-Archiver-static
 )
-set_target_properties(USDViewer PROPERTIES CXX_STANDARD 17)
-target_compile_definitions(USDViewer PRIVATE DILIGENT_FX_SHADERS_DIR="${DILIGENT_FX_SOURCE_DIR}/Shaders" HYDROGENT_SHADERS_DIR="${HYDROGENT_SHADER_DIR}/shaders")
+set_target_properties(USDViewer PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_compile_definitions(USDViewer PRIVATE DILIGENT_FX_SHADERS_DIR="${DILIGENT_FX_SOURCE_DIR}/Shaders" HYDROGENT_SHADERS_DIR="${HYDROGENT_SOURCE_DIR}/shaders")
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/assets PREFIX Assets FILES ${ASSETS} ${SHADERS})

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -84,7 +84,7 @@ void Tutorial06_Multithreading::CreatePipelineState(std::vector<StateTransitionD
     CubePsoCI.pShaderSourceFactory = pShaderSourceFactory;
     CubePsoCI.VSFilePath           = "cube.vsh";
     CubePsoCI.PSFilePath           = "cube.psh";
-    CubePsoCI.Components           = TexturedCube::VERTEX_COMPONENT_FLAG_POS_UV;
+    CubePsoCI.Components           = GEOMETRY_PRIMITIVE_VERTEX_FLAG_POS_TEX;
 
     m_pPSO = TexturedCube::CreatePipelineState(CubePsoCI, m_ConvertPSOutputToGamma);
 
@@ -111,7 +111,7 @@ void Tutorial06_Multithreading::LoadTextures(std::vector<StateTransitionDesc>& B
         // Load current texture
         std::stringstream FileNameSS;
         FileNameSS << "DGLogo" << tex << ".png";
-        auto FileName = FileNameSS.str();
+        std::string FileName = FileNameSS.str();
 
         RefCntAutoPtr<ITexture> SrcTex = TexturedCube::LoadTexture(m_pDevice, FileName.c_str());
         // Get shader resource view from the texture
@@ -164,7 +164,7 @@ void Tutorial06_Multithreading::Initialize(const SampleInitInfo& InitInfo)
     CreatePipelineState(Barriers);
 
     // Load textured cube
-    m_CubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, TexturedCube::VERTEX_COMPONENT_FLAG_POS_UV);
+    m_CubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, GEOMETRY_PRIMITIVE_VERTEX_FLAG_POS_TEX);
     m_CubeIndexBuffer  = TexturedCube::CreateIndexBuffer(m_pDevice);
     // Explicitly transition vertex and index buffers to required states
     Barriers.emplace_back(m_CubeVertexBuffer, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_VERTEX_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE);
@@ -181,8 +181,8 @@ void Tutorial06_Multithreading::Initialize(const SampleInitInfo& InitInfo)
 
 void Tutorial06_Multithreading::PopulateInstanceData()
 {
-    const auto zGridSize = static_cast<size_t>(m_GridSize);
-    m_InstanceData.resize(zGridSize * zGridSize * zGridSize);
+    const size_t zGridSize = static_cast<size_t>(m_GridSize);
+    m_Instances.resize(zGridSize * zGridSize * zGridSize);
     // Populate instance data buffer
     float fGridSize = static_cast<float>(m_GridSize);
 
@@ -213,9 +213,10 @@ void Tutorial06_Multithreading::PopulateInstanceData()
                 rotation *= float4x4::RotationY(rot_distr(gen));
                 rotation *= float4x4::RotationZ(rot_distr(gen));
                 // Combine rotation, scale and translation
-                float4x4 matrix   = rotation * float4x4::Scale(scale, scale, scale) * float4x4::Translation(xOffset, yOffset, zOffset);
-                auto&    CurrInst = m_InstanceData[instId++];
-                CurrInst.Matrix   = matrix;
+                float4x4 matrix = rotation * float4x4::Scale(scale, scale, scale) * float4x4::Translation(xOffset, yOffset, zOffset);
+
+                InstanceData& CurrInst = m_Instances[instId++];
+                CurrInst.Matrix        = matrix;
                 // Texture array index
                 CurrInst.TextureInd = tex_distr(gen);
             }
@@ -237,7 +238,7 @@ void Tutorial06_Multithreading::StopWorkerThreads()
 {
     m_RenderSubsetSignal.Trigger(true, -1);
 
-    for (auto& thread : m_WorkerThreads)
+    for (std::thread& thread : m_WorkerThreads)
     {
         thread.join();
     }
@@ -254,7 +255,7 @@ void Tutorial06_Multithreading::WorkerThreadFunc(Tutorial06_Multithreading* pThi
     for (;;)
     {
         // Wait for the signal
-        auto SignaledValue = pThis->m_RenderSubsetSignal.Wait(true, NumWorkerThreads);
+        int SignaledValue = pThis->m_RenderSubsetSignal.Wait(true, NumWorkerThreads);
         if (SignaledValue < 0)
             return;
 
@@ -270,7 +271,7 @@ void Tutorial06_Multithreading::WorkerThreadFunc(Tutorial06_Multithreading* pThi
 
         {
             // Atomically increment the number of completed threads
-            const auto NumThreadsCompleted = pThis->m_NumThreadsCompleted.fetch_add(1) + 1;
+            const int NumThreadsCompleted = pThis->m_NumThreadsCompleted.fetch_add(1) + 1;
             if (NumThreadsCompleted == NumWorkerThreads)
                 pThis->m_ExecuteCommandListsSignal.Trigger();
         }
@@ -299,7 +300,7 @@ void Tutorial06_Multithreading::RenderSubset(IDeviceContext* pCtx, Uint32 Subset
 {
     // Deferred contexts start in default state. We must bind everything to the context.
     // Render targets are set and transitioned to correct states by the main thread, here we only verify the states.
-    auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+    ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
     pCtx->SetRenderTargets(1, &pRTV, m_pSwapChain->GetDepthBufferDSV(), RESOURCE_STATE_TRANSITION_MODE_VERIFY);
 
     {
@@ -325,13 +326,13 @@ void Tutorial06_Multithreading::RenderSubset(IDeviceContext* pCtx, Uint32 Subset
     // Set the pipeline state
     pCtx->SetPipelineState(m_pPSO);
     Uint32 NumSubsets   = Uint32{1} + static_cast<Uint32>(m_WorkerThreads.size());
-    Uint32 NumInstances = static_cast<Uint32>(m_InstanceData.size());
+    Uint32 NumInstances = static_cast<Uint32>(m_Instances.size());
     Uint32 SusbsetSize  = NumInstances / NumSubsets;
     Uint32 StartInst    = SusbsetSize * Subset;
     Uint32 EndInst      = (Subset < NumSubsets - 1) ? SusbsetSize * (Subset + 1) : NumInstances;
     for (size_t inst = StartInst; inst < EndInst; ++inst)
     {
-        const auto& CurrInstData = m_InstanceData[inst];
+        const InstanceData& CurrInstData = m_Instances[inst];
         // Shader resources have been explicitly transitioned to correct states, so
         // RESOURCE_STATE_TRANSITION_MODE_TRANSITION mode is not needed.
         // Instead, we use RESOURCE_STATE_TRANSITION_MODE_VERIFY mode to
@@ -357,8 +358,8 @@ void Tutorial06_Multithreading::RenderSubset(IDeviceContext* pCtx, Uint32 Subset
 // Render a frame
 void Tutorial06_Multithreading::Render()
 {
-    auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
-    auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
+    ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+    ITextureView* pDSV = m_pSwapChain->GetDepthBufferDSV();
     // Clear the back buffer
     float4 ClearColor = {0.350f, 0.350f, 0.350f, 1.0f};
     if (m_ConvertPSOutputToGamma)
@@ -400,19 +401,18 @@ void Tutorial06_Multithreading::Render()
     }
 }
 
-void Tutorial06_Multithreading::Update(double CurrTime, double ElapsedTime)
+void Tutorial06_Multithreading::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     // Set the cube view matrix
     float4x4 View = float4x4::RotationX(-0.6f) * float4x4::Translation(0.f, 0.f, 4.0f);
 
     // Get pretransform matrix that rotates the scene according the surface orientation
-    auto SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
+    float4x4 SrfPreTransform = GetSurfacePretransformMatrix(float3{0, 0, 1});
 
     // Get projection matrix adjusted to the current screen orientation
-    auto Proj = GetAdjustedProjectionMatrix(PI_F / 4.0f, 0.1f, 100.f);
+    float4x4 Proj = GetAdjustedProjectionMatrix(PI_F / 4.0f, 0.1f, 100.f);
 
     // Compute view-projection matrix
     m_ViewProjMatrix = View * SrfPreTransform * Proj;

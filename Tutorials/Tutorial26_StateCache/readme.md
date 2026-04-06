@@ -31,7 +31,8 @@ To create a render state cache object, prepare an instance of the `RenderStateCa
 
 ```cpp
 RenderStateCacheCreateInfo CacheCI;
-CacheCI.pDevice = m_pDevice;
+CacheCI.pDevice          = m_pDevice;
+CacheCI.pArchiverFactory = LoadAndGetArchiverFactory();
 // Enable hot state reload
 CacheCI.EnableHotReload = true;
 CreateRenderStateCache(CacheCI, &m_pStateCache);
@@ -78,8 +79,8 @@ Finally, we load the data into the cache, if it exists:
 ```cpp
 if (FileSystem::FileExists(m_StateCachePath.c_str()))
 {
-    FileWrapper CacheDataFile{m_StateCachePath.c_str()};
-    auto        pCacheData = DataBlobImpl::Create();
+    FileWrapper                 CacheDataFile{m_StateCachePath.c_str()};
+    RefCntAutoPtr<DataBlobImpl> pCacheData = DataBlobImpl::Create();
     if (CacheDataFile->Read(pCacheData))
     {
         m_pStateCache->Load(pCacheData);

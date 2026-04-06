@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,16 +42,18 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "Tutorial14: Compute Shader"; }
+
+protected:
+    virtual void UpdateUI() override final;
 
 private:
     void CreateRenderParticlePSO();
     void CreateUpdateParticlePSO();
     void CreateParticleBuffers();
     void CreateConsantBuffer();
-    void UpdateUI();
 
     int m_NumParticles    = 2000;
     int m_ThreadGroupSize = 256;

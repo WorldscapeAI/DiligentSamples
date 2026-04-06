@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2024 Diligent Graphics LLC
+ *  Copyright 2023-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -67,12 +67,14 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "USD Viewer"; }
 
+protected:
+    virtual void UpdateUI() override final;
+
 private:
-    void UpdateUI();
     void LoadStage();
     void LoadEnvironmentMap(const char* Path);
     void PopulateSceneTree(const pxr::UsdPrim& Prim);
@@ -109,9 +111,9 @@ private:
         float    MetersPerUnit = 0.01f;
         float4x4 RootTransform = float4x4::Identity();
 
-        int  DebugViewMode = 0;
-        int  RenderMode    = 0;
-        bool UseShadows    = true;
+        int  ViewMode     = 0;
+        int  GeometryMode = 0;
+        bool UseShadows   = true;
 
         struct AnimationInfo
         {
@@ -133,9 +135,8 @@ private:
 
     pxr::HdEngine m_Engine;
 
-    USD::HnRenderRprimsTaskParams m_RenderParams;
-    USD::HnPostProcessTaskParams  m_PostProcessParams;
-    USD::HnBeginFrameTaskParams   m_FrameParams;
+    USD::HnPostProcessTaskParams m_PostProcessParams;
+    USD::HnBeginFrameTaskParams  m_FrameParams;
 
     Uint32 m_SSRSettingsDisplayMode = 0;
 
@@ -179,6 +180,9 @@ private:
         // Sensor width and height in millimeters
         float SensorWidth_mm  = 36.0f;
         float SensorHeight_mm = 24.0f;
+
+        // 0 - perspective, 1 - orthographic
+        int Projection = 0;
     } m_CameraSettings;
 
     struct RenderStats

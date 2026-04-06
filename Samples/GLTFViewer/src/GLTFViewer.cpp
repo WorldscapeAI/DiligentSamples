@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -73,7 +73,7 @@ SampleBase* CreateSample()
 const std::pair<const char*, const char*> DefaultGLTFModels[] =
 {
     {"Damaged Helmet",               "models/DamagedHelmet/DamagedHelmet.gltf"},
-#if !PLATFORM_EMSCRIPTEN
+#if !PLATFORM_WEB
     {"Barbie Dodge Pickup",          "models/BarbieDodgePickup/scene.gltf"},
 #endif
     {"Flight Helmet",                "models/FlightHelmet/glTF/FlightHelmet.gltf"},
@@ -82,7 +82,7 @@ const std::pair<const char*, const char*> DefaultGLTFModels[] =
     {"Clearcoat Ring",               "models/ClearcoatRing/glTF/ClearcoatRing.gltf"},
     {"Glam Velvet Sofa",             "models/GlamVelvetSofa/glTF/GlamVelvetSofa.gltf"},
     {"Iridescence Abalone",          "models/IridescenceAbalone/glTF/IridescenceAbalone.gltf"},
-#if !PLATFORM_EMSCRIPTEN
+#if !PLATFORM_WEB
     {"Iridescent Dish With Olives",  "models/IridescentDishWithOlives/glTF/IridescentDishWithOlives.gltf"},
 #endif
     {"Toy Car",                      "models/ToyCar/glTF/ToyCar.gltf"},
@@ -182,7 +182,7 @@ void GLTFViewer::LoadModel(const char* Path)
     m_CameraId = 0;
     m_CameraNodes.clear();
     m_LightNodes.clear();
-    for (const auto* node : m_Model->Scenes[m_RenderParams.SceneIndex].LinearNodes)
+    for (const GLTF::Node* node : m_Model->Scenes[m_RenderParams.SceneIndex].LinearNodes)
     {
         if (node->pCamera != nullptr && node->pCamera->Type == GLTF::Camera::Projection::Perspective)
             m_CameraNodes.push_back(node);
@@ -235,7 +235,7 @@ void GLTFViewer::UpdateScene()
     MaxDim = std::max(MaxDim, ModelDim.z);
 
     m_SceneScale       = (1.0f / std::max(MaxDim, 0.01f)) * 0.5f;
-    auto     Translate = -m_ModelAABB.Min - 0.5f * ModelDim;
+    float3   Translate = -m_ModelAABB.Min - 0.5f * ModelDim;
     float4x4 InvYAxis  = float4x4::Identity();
     InvYAxis._22       = -1;
 
@@ -246,7 +246,7 @@ void GLTFViewer::UpdateScene()
 }
 
 
-void GLTFViewer::UpdateModelsList(const std::string& Dir)
+void GLTFViewer::UpdateModelsList(const std::string& Dir, const std::string& Ext)
 {
     m_Models.clear();
     for (size_t i = 0; i < _countof(DefaultGLTFModels); ++i)
@@ -257,8 +257,17 @@ void GLTFViewer::UpdateModelsList(const std::string& Dir)
 #if PLATFORM_WIN32 || PLATFORM_LINUX || PLATFORM_MACOS
     if (!Dir.empty())
     {
-        auto SearchRes = FileSystem::SearchRecursive(Dir.c_str(), "*.gltf");
-        for (const auto& File : SearchRes)
+        FileSystem::SearchFilesResult SearchRes{};
+        std::vector<std::string>      Patterns = Ext.empty() ? std::vector<std::string>{{"*.gltf"}} : SplitString(Ext.begin(), Ext.end(), ";");
+        for (const std::string& Pattern : Patterns)
+        {
+            FileSystem::SearchFilesResult CurrentSearchRes = FileSystem::SearchRecursive(Dir.c_str(), Pattern.c_str());
+            std::move(CurrentSearchRes.begin(), CurrentSearchRes.end(), std::back_inserter(SearchRes));
+        }
+        std::sort(SearchRes.begin(), SearchRes.end(), [](const FindFileData& lhs, const FindFileData& rhs) -> bool {
+            return lhs.Name < rhs.Name;
+        });
+        for (const FindFileData& File : SearchRes)
         {
             m_Models.push_back(ModelInfo{File.Name, Dir + FileSystem::SlashSymbol + File.Name});
         }
@@ -281,21 +290,23 @@ GLTFViewer::CommandLineStatus GLTFViewer::ProcessCommandLine(int argc, const cha
         m_TextureArrayMode);
 
     std::string ExtraModelsDir;
+    std::string ExtraModelsExt;
     ArgsParser.Parse("dir", 'd', ExtraModelsDir);
-    UpdateModelsList(ExtraModelsDir.c_str());
+    ArgsParser.Parse("ext", 'e', ExtraModelsExt);
+    UpdateModelsList(ExtraModelsDir.c_str(), ExtraModelsExt.c_str());
 
     return CommandLineStatus::OK;
 }
 
 void GLTFViewer::CreateGLTFResourceCache()
 {
-    auto InputLayout = GLTF::VertexAttributesToInputLayout(GLTF::DefaultVertexAttributes.data(), static_cast<Uint32>(GLTF::DefaultVertexAttributes.size()));
-    auto Strides     = InputLayout.ResolveAutoOffsetsAndStrides();
+    InputLayoutDescX    InputLayout = GLTF::VertexAttributesToInputLayout(GLTF::DefaultVertexAttributes.data(), static_cast<Uint32>(GLTF::DefaultVertexAttributes.size()));
+    std::vector<Uint32> Strides     = InputLayout.ResolveAutoOffsetsAndStrides();
 
     std::vector<VertexPoolElementDesc> VtxPoolElems;
     VtxPoolElems.reserve(Strides.size());
     m_CacheUseInfo.VtxLayoutKey.Elements.reserve(Strides.size());
-    for (const auto& Stride : Strides)
+    for (const Uint32& Stride : Strides)
     {
         VtxPoolElems.emplace_back(Stride, BIND_VERTEX_BUFFER);
         m_CacheUseInfo.VtxLayoutKey.Elements.emplace_back(Stride, BIND_VERTEX_BUFFER);
@@ -338,12 +349,8 @@ void GLTFViewer::CreateGLTFResourceCache()
     m_pResourceMgr = GLTF::ResourceManager::Create(m_pDevice, ResourceMgrCI);
 
     m_CacheUseInfo.pResourceMgr = m_pResourceMgr;
-
-    m_CacheUseInfo.BaseColorFormat    = TEX_FORMAT_RGBA8_UNORM;
-    m_CacheUseInfo.PhysicalDescFormat = TEX_FORMAT_RGBA8_UNORM;
-    m_CacheUseInfo.NormalFormat       = TEX_FORMAT_RGBA8_UNORM;
-    m_CacheUseInfo.OcclusionFormat    = TEX_FORMAT_RGBA8_UNORM;
-    m_CacheUseInfo.EmissiveFormat     = TEX_FORMAT_RGBA8_UNORM;
+    // GLTF loader uses typeless format for texture atlases to allow UNORM and SRGB usage.
+    m_CacheUseInfo.SetAtlasFormats(TEX_FORMAT_RGBA8_TYPELESS);
 }
 
 static RefCntAutoPtr<ITextureView> CreateWhiteFurnaceEnvMap(IRenderDevice* pDevice)
@@ -363,7 +370,7 @@ static RefCntAutoPtr<ITextureView> CreateWhiteFurnaceEnvMap(IRenderDevice* pDevi
 
     std::vector<Uint32>            Data(6 * TexDesc.Width * TexDesc.Height, 0xFFFFFFFFu);
     std::vector<TextureSubResData> SubResData(6);
-    for (auto& Subres : SubResData)
+    for (TextureSubResData& Subres : SubResData)
     {
         Subres.pData  = Data.data();
         Subres.Stride = TexDesc.Width * sizeof(Uint32);
@@ -552,6 +559,12 @@ void GLTFViewer::CreateGLTFRenderer()
     RendererCI.pMaterialAttribsCB  = m_GLTFRenderer ? m_GLTFRenderer->GetPBRMaterialAttribsCB() : nullptr;
     RendererCI.pJointsBuffer       = m_GLTFRenderer ? m_GLTFRenderer->GetJointsBuffer() : nullptr;
 
+    // Using TEX_COLOR_CONVERSION_MODE_NONE requires creating sRGB views, which is not supported
+    // when TextureSubresourceViews feature is not available.
+    RendererCI.TexColorConversionMode = m_pDevice->GetDeviceInfo().Features.TextureSubresourceViews ?
+        GLTF_PBR_Renderer::CreateInfo::TEX_COLOR_CONVERSION_MODE_NONE :
+        GLTF_PBR_Renderer::CreateInfo::TEX_COLOR_CONVERSION_MODE_SRGB_TO_LINEAR;
+
     m_GLTFRenderer = std::make_unique<GLTF_PBR_Renderer>(m_pDevice, nullptr, m_pImmediateContext, RendererCI);
 
     if (m_bUseResourceCache)
@@ -570,8 +583,8 @@ void GLTFViewer::CreateGLTFRenderer()
     // Reset environment map in GLTF renderer
     if (m_pCurrentEnvMapSRV != nullptr)
     {
-        auto* pEnvMap       = m_pCurrentEnvMapSRV;
-        m_pCurrentEnvMapSRV = nullptr;
+        ITextureView* pEnvMap = m_pCurrentEnvMapSRV;
+        m_pCurrentEnvMapSRV   = nullptr;
         SetEnvironmentMap(pEnvMap);
     }
 }
@@ -621,25 +634,6 @@ void main(in BoundBoxVSOutput VSOut,
 }
 )";
 
-static constexpr char BoundBoxPSMainGL[] = R"(
-void main(in BoundBoxVSOutput VSOut,
-          out float4 Color        : SV_Target0,
-          out float4 Normal       : SV_Target1,
-          out float4 BaseColor    : SV_Target2,
-          out float4 MaterialData : SV_Target3,
-          out float4 MotionVec    : SV_Target4,
-          out float4 SpecularIBL  : SV_Target5)
-{
-    BoundBoxOutput BBOutput = GetBoundBoxOutput(VSOut);
-    Color        = BBOutput.Color;
-    Normal       = float4(0.0, 0.0, 0.0, 0.0);
-	BaseColor    = float4(0.0, 0.0, 0.0, 0.0);
-    MaterialData = float4(0.0, 0.0, 0.0, 0.0);
-    MotionVec    = float4(BBOutput.MotionVector, 0.0, 1.0);
-    SpecularIBL  = float4(0.0, 0.0, 0.0, 0.0);
-}
-)";
-
 void GLTFViewer::CrateBoundBoxRenderer()
 {
     BoundBoxRenderer::CreateInfo BoundBoxRendererCI;
@@ -653,16 +647,8 @@ void GLTFViewer::CrateBoundBoxRenderer()
             BoundBoxRendererCI.RTVFormats[i] = m_GBuffer->GetElementDesc(i).Format;
         BoundBoxRendererCI.DSVFormat = m_GBuffer->GetElementDesc(GBUFFER_RT_DEPTH0).Format;
 
-        if (m_pDevice->GetDeviceInfo().IsGLDevice() || m_pDevice->GetDeviceInfo().IsWebGPUDevice())
-        {
-            // Normally, environment map shader only needs to write color and motion vector.
-            // However, on WebGL and WebGPU this results in errors.
-            BoundBoxRendererCI.PSMainSource = BoundBoxPSMainGL;
-        }
-        else
-        {
-            BoundBoxRendererCI.PSMainSource = BoundBoxPSMain;
-        }
+        BoundBoxRendererCI.PSMainSource     = BoundBoxPSMain;
+        BoundBoxRendererCI.RenderTargetMask = GBUFFER_RT_FLAG_COLOR | GBUFFER_RT_FLAG_MOTION_VECTORS;
     }
     else
     {
@@ -731,7 +717,7 @@ void GLTFViewer::Initialize(const SampleInitInfo& InitInfo)
     if (m_Models.empty())
     {
         // ProcessCommandLine is not called on all platforms, so we need to initialize the models list.
-        UpdateModelsList("");
+        UpdateModelsList("", "");
     }
     LoadModel(!m_ModelPath.empty() ? m_ModelPath.c_str() : m_Models[m_SelectedModel].Path.c_str());
 }
@@ -749,8 +735,8 @@ void GLTFViewer::ApplyPosteffects::Initialize(IRenderDevice* pDevice, TEXTURE_FO
     ShaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
     ShaderCI.CompileFlags   = SHADER_COMPILE_FLAG_PACK_MATRIX_ROW_MAJOR;
 
-    auto pCompoundSourceFactory         = CreateCompoundShaderSourceFactory(pDevice);
-    ShaderCI.pShaderSourceStreamFactory = pCompoundSourceFactory;
+    RefCntAutoPtr<IShaderSourceInputStreamFactory> pCompoundSourceFactory = CreateCompoundShaderSourceFactory(pDevice);
+    ShaderCI.pShaderSourceStreamFactory                                   = pCompoundSourceFactory;
 
     ShaderMacroHelper Macros;
     Macros.Add("CONVERT_OUTPUT_TO_SRGB", RTVFormat == TEX_FORMAT_RGBA8_UNORM || RTVFormat == TEX_FORMAT_BGRA8_UNORM);
@@ -834,7 +820,7 @@ void GLTFViewer::UpdateUI()
             FileDialogAttribs OpenDialogAttribs{FILE_DIALOG_TYPE_OPEN};
             OpenDialogAttribs.Title  = "Select GLTF file";
             OpenDialogAttribs.Filter = "glTF files\0*.gltf;*.glb\0";
-            auto FileName            = FileSystem::FileDialog(OpenDialogAttribs);
+            std::string FileName     = FileSystem::FileDialog(OpenDialogAttribs);
             if (!FileName.empty())
             {
                 LoadModel(FileName.c_str());
@@ -846,7 +832,7 @@ void GLTFViewer::UpdateUI()
             FileDialogAttribs OpenDialogAttribs{FILE_DIALOG_TYPE_OPEN};
             OpenDialogAttribs.Title  = "Select HDR file";
             OpenDialogAttribs.Filter = "HDR files (*.hdr)\0*.hdr;\0All files\0*.*\0\0";
-            auto FileName            = FileSystem::FileDialog(OpenDialogAttribs);
+            std::string FileName     = FileSystem::FileDialog(OpenDialogAttribs);
             if (!FileName.empty())
                 LoadEnvironmentMap(FileName.data());
         }
@@ -870,7 +856,7 @@ void GLTFViewer::UpdateUI()
             CamList.emplace_back(0, "default");
             for (Uint32 i = 0; i < m_CameraNodes.size(); ++i)
             {
-                const auto& Cam = *m_CameraNodes[i]->pCamera;
+                const GLTF::Camera& Cam = *m_CameraNodes[i]->pCamera;
                 CamList.emplace_back(i + 1, Cam.Name.empty() ? std::to_string(i) : Cam.Name);
             }
 
@@ -880,7 +866,7 @@ void GLTFViewer::UpdateUI()
 
         if (m_CameraId == 0)
         {
-            auto ModelRotation = m_Camera.GetSecondaryRotation();
+            QuaternionF ModelRotation = m_Camera.GetSecondaryRotation();
             if (ImGui::gizmo3D("Model Rotation", ModelRotation, ImGui::GetTextLineHeight() * 10))
                 m_Camera.SetSecondaryRotation(ModelRotation);
             ImGui::SameLine();
@@ -894,7 +880,7 @@ void GLTFViewer::UpdateUI()
                 m_Camera.ResetDefaults();
             }
 
-            auto CameraDist = m_Camera.GetDist();
+            float CameraDist = m_Camera.GetDist();
             if (ImGui::SliderFloat("Camera distance", &CameraDist, m_Camera.GetMinDist(), m_Camera.GetMaxDist()))
                 m_Camera.SetDist(CameraDist);
         }
@@ -949,7 +935,7 @@ void GLTFViewer::UpdateUI()
         {
             std::array<const char*, static_cast<size_t>(BackgroundMode::NumModes)> BackgroundModes;
             BackgroundModes[static_cast<size_t>(BackgroundMode::None)]              = "None";
-            BackgroundModes[static_cast<size_t>(BackgroundMode::EnvironmentMap)]    = "Environmen Map";
+            BackgroundModes[static_cast<size_t>(BackgroundMode::EnvironmentMap)]    = "Environment Map";
             BackgroundModes[static_cast<size_t>(BackgroundMode::Irradiance)]        = "Irradiance";
             BackgroundModes[static_cast<size_t>(BackgroundMode::PrefilteredEnvMap)] = "PrefilteredEnvMap";
             ImGui::Combo("Background mode", reinterpret_cast<int*>(&m_BackgroundMode), BackgroundModes.data(), static_cast<int>(BackgroundModes.size()));
@@ -994,7 +980,7 @@ void GLTFViewer::UpdateUI()
                 {GLTF_PBR_Renderer::DebugViewType::Transmission, "Transmission"},
                 {GLTF_PBR_Renderer::DebugViewType::Thickness, "Volume Thickness"},
             };
-            static_assert(_countof(DebugViews) == 34, "Did you add a new debug view mode? You may want to handle it here");
+            static_assert(static_cast<size_t>(GLTF_PBR_Renderer::DebugViewType::NumDebugViews) == 35, "Did you add a new debug view mode? You may want to handle it here");
 
             ImGui::Combo("Debug view", &m_RenderParams.DebugView, DebugViews, _countof(DebugViews), 15);
         }
@@ -1160,16 +1146,16 @@ void GLTFViewer::Render()
     else
     {
         // Clear the back buffer
-        const float ClearColor[] = {0.032f, 0.032f, 0.032f, 1.0f};
+        const float ClearColor[] = {0.032f, 0.032f, 0.032f, 0.0f};
         m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
         m_pImmediateContext->ClearDepthStencil(pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     }
 
 
-    const auto& CurrCamAttribs = m_CameraAttribs[m_CurrentFrameNumber & 0x01];
-    const auto& PrevCamAttribs = m_CameraAttribs[(m_CurrentFrameNumber + 1) & 0x01];
-    const auto& CurrTransforms = m_Transforms[m_CurrentFrameNumber & 0x01];
-    const auto& PrevTransforms = m_Transforms[(m_CurrentFrameNumber + 1) & 0x01];
+    const HLSL::CameraAttribs&   CurrCamAttribs = m_CameraAttribs[m_CurrentFrameNumber & 0x01];
+    const HLSL::CameraAttribs&   PrevCamAttribs = m_CameraAttribs[(m_CurrentFrameNumber + 1) & 0x01];
+    const GLTF::ModelTransforms& CurrTransforms = m_Transforms[m_CurrentFrameNumber & 0x01];
+    const GLTF::ModelTransforms& PrevTransforms = m_Transforms[(m_CurrentFrameNumber + 1) & 0x01];
 
     {
         MapHelper<HLSL::PBRFrameAttribs> FrameAttribs{m_pImmediateContext, m_FrameAttribsCB, MAP_WRITE, MAP_FLAG_DISCARD};
@@ -1202,8 +1188,8 @@ void GLTFViewer::Render()
                 }
                 else if (m_BoundBoxMode == BoundBoxMode::Global)
                 {
-                    auto TransformedBB  = m_ModelAABB.Transform(m_RenderParams.ModelTransform);
-                    m_BoundBoxTransform = float4x4::Scale(TransformedBB.Max - TransformedBB.Min) * float4x4::Translation(TransformedBB.Min);
+                    BoundBox TransformedBB = m_ModelAABB.Transform(m_RenderParams.ModelTransform);
+                    m_BoundBoxTransform    = float4x4::Scale(TransformedBB.Max - TransformedBB.Min) * float4x4::Translation(TransformedBB.Min);
                 }
                 else
                 {
@@ -1218,14 +1204,14 @@ void GLTFViewer::Render()
 #    error PBR_MAX_LIGHTS should not be defined here
 #endif
             // Light data follows the render attributes
-            auto* Lights = reinterpret_cast<HLSL::PBRLightAttribs*>(FrameAttribs + 1);
+            HLSL::PBRLightAttribs* Lights = reinterpret_cast<HLSL::PBRLightAttribs*>(FrameAttribs + 1);
             if (!m_LightNodes.empty())
             {
                 LightCount = std::min(static_cast<Uint32>(m_LightNodes.size()), m_GLTFRenderer->GetSettings().MaxLightCount);
                 for (int i = 0; i < LightCount; ++i)
                 {
-                    const auto& LightNode            = *m_LightNodes[i];
-                    const auto  LightGlobalTransform = m_Transforms[m_CurrentFrameNumber & 0x01].NodeGlobalMatrices[LightNode.Index] * m_RenderParams.ModelTransform;
+                    const GLTF::Node& LightNode            = *m_LightNodes[i];
+                    const float4x4    LightGlobalTransform = m_Transforms[m_CurrentFrameNumber & 0x01].NodeGlobalMatrices[LightNode.Index] * m_RenderParams.ModelTransform;
 
                     // The light direction is along the negative Z axis of the light's local space.
                     // https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_lights_punctual#adding-light-instances-to-nodes
@@ -1242,7 +1228,7 @@ void GLTFViewer::Render()
             }
         }
         {
-            auto& Renderer = FrameAttribs->Renderer;
+            HLSL::PBRRendererShaderParameters& Renderer = FrameAttribs->Renderer;
             m_GLTFRenderer->SetInternalShaderParameters(Renderer);
 
             Renderer.OcclusionStrength = m_ShaderAttribs.OcclusionStrength;
@@ -1256,6 +1242,7 @@ void GLTFViewer::Render()
             Renderer.PointSize         = 1;
             Renderer.MipBias           = 0;
             Renderer.LightCount        = LightCount;
+            Renderer.DebugView         = static_cast<int>(m_RenderParams.DebugView);
         }
     }
 
@@ -1269,7 +1256,7 @@ void GLTFViewer::Render()
     }
 
     auto RenderModel = [&](GLTF_PBR_Renderer::RenderInfo::ALPHA_MODE_FLAGS AlphaModes) {
-        const auto OrigAlphaModes = m_RenderParams.AlphaModes;
+        const GLTF_PBR_Renderer::RenderInfo::ALPHA_MODE_FLAGS OrigAlphaModes = m_RenderParams.AlphaModes;
 
         m_RenderParams.AlphaModes &= AlphaModes;
         if (m_RenderParams.AlphaModes != GLTF_PBR_Renderer::RenderInfo::ALPHA_MODE_FLAG_NONE)
@@ -1321,11 +1308,11 @@ void GLTFViewer::Render()
         EnvMapAttribs.pEnvMap       = pEnvMapSRV;
         EnvMapAttribs.AverageLogLum = m_ShaderAttribs.AverageLogLum;
         EnvMapAttribs.MipLevel      = m_EnvMapMipLevel;
-        // It is essential to write zero alpha because we use alpha channel
-        // to attenuate SSR for transparent surfaces.
-        EnvMapAttribs.Alpha                = 0.0;
-        EnvMapAttribs.ConvertOutputToSRGB  = (m_RenderParams.Flags & GLTF_PBR_Renderer::PSO_FLAG_CONVERT_OUTPUT_TO_SRGB) != 0;
-        EnvMapAttribs.ComputeMotionVectors = m_bEnablePostProcessing;
+        EnvMapAttribs.Alpha         = 0.0;
+        if ((m_RenderParams.Flags & GLTF_PBR_Renderer::PSO_FLAG_CONVERT_OUTPUT_TO_SRGB) != 0)
+            EnvMapAttribs.Options |= EnvMapRenderer::OPTION_FLAG_CONVERT_OUTPUT_TO_SRGB;
+        if (m_bEnablePostProcessing)
+            EnvMapAttribs.Options |= EnvMapRenderer::OPTION_FLAG_COMPUTE_MOTION_VECTORS;
 
         m_EnvMapRenderer->Prepare(m_pImmediateContext, EnvMapAttribs, TMAttribs);
         m_EnvMapRenderer->Render(m_pImmediateContext);
@@ -1336,11 +1323,13 @@ void GLTFViewer::Render()
     if (m_BoundBoxMode != BoundBoxMode::None)
     {
         BoundBoxRenderer::RenderAttribs Attribs;
-        Attribs.ConvertOutputToSRGB  = (SCDesc.ColorBufferFormat == TEX_FORMAT_RGBA8_UNORM || SCDesc.ColorBufferFormat == TEX_FORMAT_BGRA8_UNORM);
-        constexpr float4 BBColor     = float4{0.5, 0.0, 0.0, 1.0};
-        Attribs.Color                = &BBColor;
-        Attribs.BoundBoxTransform    = &m_BoundBoxTransform;
-        Attribs.ComputeMotionVectors = m_bEnablePostProcessing;
+        if (SCDesc.ColorBufferFormat == TEX_FORMAT_RGBA8_UNORM || SCDesc.ColorBufferFormat == TEX_FORMAT_BGRA8_UNORM)
+            Attribs.Options |= BoundBoxRenderer::OPTION_FLAG_CONVERT_OUTPUT_TO_SRGB;
+        if (m_bEnablePostProcessing)
+            Attribs.Options |= BoundBoxRenderer::OPTION_FLAG_COMPUTE_MOTION_VECTORS;
+        constexpr float4 BBColor  = float4{0.5, 0.0, 0.0, 1.0};
+        Attribs.Color             = &BBColor;
+        Attribs.BoundBoxTransform = &m_BoundBoxTransform;
         m_BoundBoxRenderer->Prepare(m_pImmediateContext, Attribs);
         m_BoundBoxRenderer->Render(m_pImmediateContext);
     }
@@ -1389,7 +1378,7 @@ void GLTFViewer::Render()
 
         m_pImmediateContext->SetRenderTargets(1, &pRTV, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
         // Clear the back buffer
-        const float ClearColor[] = {0.032f, 0.032f, 0.032f, 1.0f};
+        const float ClearColor[] = {0.032f, 0.032f, 0.032f, 0.0f};
         m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
         m_pImmediateContext->SetPipelineState(m_ApplyPostFX.pPSO);
@@ -1422,15 +1411,14 @@ void GLTFViewer::Render()
     }
 }
 
-void GLTFViewer::Update(double CurrTime, double ElapsedTime)
+void GLTFViewer::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
     if (m_CameraId == 0)
     {
         m_Camera.Update(m_InputController);
     }
 
-    SampleBase::Update(CurrTime, ElapsedTime);
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     m_ElapsedTime = static_cast<float>(ElapsedTime);
 
@@ -1447,9 +1435,9 @@ void GLTFViewer::Update(double CurrTime, double ElapsedTime)
     }
     else
     {
-        const auto* pCameraNode           = m_CameraNodes[m_CameraId - 1];
-        const auto* pCamera               = pCameraNode->pCamera;
-        const auto& CameraGlobalTransform = m_Transforms[m_CurrentFrameNumber & 0x01].NodeGlobalMatrices[pCameraNode->Index];
+        const GLTF::Node*   pCameraNode           = m_CameraNodes[m_CameraId - 1];
+        const GLTF::Camera* pCamera               = pCameraNode->pCamera;
+        const float4x4&     CameraGlobalTransform = m_Transforms[m_CurrentFrameNumber & 0x01].NodeGlobalMatrices[pCameraNode->Index];
 
         // GLTF camera is defined such that the local +X axis is to the right,
         // the lens looks towards the local -Z axis, and the top of the camera
@@ -1473,24 +1461,25 @@ void GLTFViewer::Update(double CurrTime, double ElapsedTime)
     float4x4 CameraWorld = CameraView.Inverse();
 
     // Get projection matrix adjusted to the current screen orientation
-    const auto CameraProj     = GetAdjustedProjectionMatrix(YFov, ZNear, ZFar);
-    const auto CameraViewProj = CameraView * CameraProj;
+    const float4x4 CameraProj     = GetAdjustedProjectionMatrix(YFov, ZNear, ZFar);
+    const float4x4 CameraViewProj = CameraView * CameraProj;
 
     float3 CameraWorldPos = float3::MakeVector(CameraWorld[3]);
 
-    auto& CurrCamAttribs = m_CameraAttribs[m_CurrentFrameNumber & 0x01];
+    HLSL::CameraAttribs& CurrCamAttribs = m_CameraAttribs[m_CurrentFrameNumber & 0x01];
 
-    const auto& SCDesc = m_pSwapChain->GetDesc();
+    const SwapChainDesc& SCDesc = m_pSwapChain->GetDesc();
 
     CurrCamAttribs.f4ViewportSize = float4{static_cast<float>(SCDesc.Width), static_cast<float>(SCDesc.Height), 1.f / SCDesc.Width, 1.f / SCDesc.Height};
-    CurrCamAttribs.fHandness      = CameraView.Determinant() > 0 ? 1.f : -1.f;
-    CurrCamAttribs.mView          = CameraView;
-    CurrCamAttribs.mProj          = CameraProj;
-    CurrCamAttribs.mViewProj      = CameraViewProj;
-    CurrCamAttribs.mViewInv       = CameraView.Inverse();
-    CurrCamAttribs.mProjInv       = CameraProj.Inverse();
-    CurrCamAttribs.mViewProjInv   = CameraViewProj.Inverse();
-    CurrCamAttribs.f4Position     = float4(CameraWorldPos, 1);
+    CurrCamAttribs.SetClipPlanes(ZNear, ZFar);
+    CurrCamAttribs.fHandness    = CameraView.Determinant() > 0 ? 1.f : -1.f;
+    CurrCamAttribs.mView        = CameraView;
+    CurrCamAttribs.mProj        = CameraProj;
+    CurrCamAttribs.mViewProj    = CameraViewProj;
+    CurrCamAttribs.mViewInv     = CameraView.Inverse();
+    CurrCamAttribs.mProjInv     = CameraProj.Inverse();
+    CurrCamAttribs.mViewProjInv = CameraViewProj.Inverse();
+    CurrCamAttribs.f4Position   = float4(CameraWorldPos, 1);
 
     if (m_bResetPrevCamera)
     {

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,13 +31,14 @@
 
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_VARARGS
-#include "../../../ThirdParty/nuklear/nuklear.h"
+#include "../../../ThirdParty/Nuklear/nuklear.h"
 
 #include "NkDiligent.h"
 
-#include "../../../ThirdParty/nuklear/demo/style.c"
-#include "../../../ThirdParty/nuklear/demo/overview.c"
+#include "../../../ThirdParty/Nuklear/demo/common/style.c"
 
+static const struct nk_color nk_white = {255, 255, 255, 255};
+#include "../../../ThirdParty/Nuklear/demo/common/overview.c"
 
 namespace Diligent
 {
@@ -59,7 +60,7 @@ void NuklearDemo::Initialize(const SampleInitInfo& InitInfo)
     constexpr Uint32 NuklearMaxVBSize = 512 * 1024;
     constexpr Uint32 NuklearMaxIBSize = 128 * 1024;
 
-    const auto& SCDesc = m_pSwapChain->GetDesc();
+    const SwapChainDesc& SCDesc = m_pSwapChain->GetDesc();
 
     m_pNkDlgCtx = nk_diligent_init(m_pDevice, SCDesc.Width, SCDesc.Height, SCDesc.ColorBufferFormat, SCDesc.DepthBufferFormat, NuklearMaxVBSize, NuklearMaxIBSize);
     m_pNkCtx    = nk_diligent_get_nk_ctx(m_pNkDlgCtx);
@@ -86,7 +87,7 @@ void NuklearDemo::UpdateUI()
 // Render a frame
 void NuklearDemo::Render()
 {
-    auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+    ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
 
     const float4 ClearColor = {0.45f, 0.55f, 0.60f, 1.00f};
     m_pImmediateContext->ClearRenderTarget(pRTV, &ClearColor.x, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
@@ -95,11 +96,9 @@ void NuklearDemo::Render()
 }
 
 
-void NuklearDemo::Update(double CurrTime, double ElapsedTime)
+void NuklearDemo::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 }
 
 void NuklearDemo::WindowResize(Uint32 Width, Uint32 Height)

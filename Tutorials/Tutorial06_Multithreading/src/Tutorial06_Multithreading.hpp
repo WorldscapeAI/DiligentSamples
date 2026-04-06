@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,14 +46,16 @@ public:
     virtual void Initialize(const SampleInitInfo& InitInfo) override final;
 
     virtual void Render() override final;
-    virtual void Update(double CurrTime, double ElapsedTime) override final;
+    virtual void Update(double CurrTime, double ElapsedTime, bool DoUpdateUI) override final;
 
     virtual const Char* GetSampleName() const override final { return "Tutorial06: Multithreaded rendering"; }
+
+protected:
+    virtual void UpdateUI() override final;
 
 private:
     void CreatePipelineState(std::vector<StateTransitionDesc>& Barriers);
     void LoadTextures(std::vector<StateTransitionDesc>& Barriers);
-    void UpdateUI();
     void PopulateInstanceData();
 
     void StartWorkerThreads(size_t NumThreads);
@@ -96,7 +98,7 @@ private:
         float4x4 Matrix;
         int      TextureInd = 0;
     };
-    std::vector<InstanceData> m_InstanceData;
+    std::vector<InstanceData> m_Instances;
 };
 
 } // namespace Diligent

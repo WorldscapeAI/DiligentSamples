@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2024 Diligent Graphics LLC
+ *  Copyright 2023-2025 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@
 #include "FileSystem.hpp"
 #include "Timer.hpp"
 #include "RenderStateCache.h"
+#include "ArchiverFactoryLoader.h"
 #include "ThreadPool.hpp"
 
 #include "Tasks/HnReadRprimIdTask.hpp"
@@ -186,7 +187,8 @@ void USDViewer::Initialize(const SampleInitInfo& InitInfo)
     {
         // Create render state cache
         RenderStateCacheCreateInfo StateCacheCI;
-        StateCacheCI.LogLevel = RENDER_STATE_CACHE_LOG_LEVEL_NORMAL;
+        StateCacheCI.pArchiverFactory = LoadAndGetArchiverFactory();
+        StateCacheCI.LogLevel         = RENDER_STATE_CACHE_LOG_LEVEL_NORMAL;
 
         RefCntAutoPtr<IShaderSourceInputStreamFactory> pReloadFactory;
         if (m_EnableHotShaderReload)
@@ -348,8 +350,10 @@ void USDViewer::LoadStage()
     DelegateCI.AsyncTextureLoading    = m_AsyncTextureLoading;
     DelegateCI.PackVertexNormals      = true;
     DelegateCI.PackVertexPositions    = true;
+    DelegateCI.PackVertexColors       = true;
     DelegateCI.TextureLoadBudget      = Uint64{1024} << Uint64{20};
     DelegateCI.GeometryLoadBudget     = Uint64{64} << Uint64{20};
+    DelegateCI.OITLayerCount          = 4;
 
     if (m_DeviceWithCache.GetDeviceInfo().Features.BindlessResources)
     {
@@ -411,11 +415,15 @@ void USDViewer::LoadStage()
     AddDirectionalLight("_HnDirectionalLight3_", 5000.f, pxr::GfRotation{pxr::GfVec3d{1, 0.0, 0.5}, -40}, 1024);
 
     // Environment map
-    if (!HasDomeLight(*m_Stage.Stage))
     {
+        const bool StageHasDomeLight   = HasDomeLight(*m_Stage.Stage);
         m_Stage.DomeLightId            = SceneDelegateId.AppendChild(pxr::TfToken{"_HnDomeLight_"});
         pxr::UsdLuxDomeLight DomeLight = pxr::UsdLuxDomeLight::Define(m_Stage.Stage, m_Stage.DomeLightId);
         DomeLight.CreateTextureFileAttr().Set(pxr::SdfAssetPath{"textures/papermill.ktx"});
+        if (StageHasDomeLight)
+        {
+            DomeLight.MakeInvisible();
+        }
     }
 
 #if 0
@@ -479,13 +487,11 @@ void USDViewer::LoadStage()
     UpdateCamera();
 
     m_FrameParams                                     = {};
-    m_FrameParams.State.FrontFaceCCW                  = true;
     m_FrameParams.FinalColorTargetId                  = FinalColorTargetId;
     m_FrameParams.CameraId                            = m_Stage.CameraId;
     m_FrameParams.Renderer.LoadingAnimationWorldScale = 1.f / SceneExtent;
+    m_FrameParams.UseReverseDepth                     = (m_DeviceWithCache.GetDeviceInfo().NDC.MinZ == 0);
     m_Stage.TaskManager->SetFrameParams(m_FrameParams);
-
-    m_Stage.TaskManager->SetRenderRprimParams(m_RenderParams);
 
     m_PostProcessParams                              = {};
     m_PostProcessParams.ToneMapping.iToneMappingMode = TONE_MAPPING_MODE_UNCHARTED2;
@@ -729,7 +735,6 @@ void USDViewer::EditSelectedPrimTransform()
 
 void USDViewer::UpdateUI()
 {
-    bool UpdateRenderParams      = false;
     bool UpdateFrameParams       = false;
     bool UpdatePostProcessParams = false;
 
@@ -845,14 +850,24 @@ void USDViewer::UpdateUI()
                     const auto         CameraDist = m_Camera.GetDist();
                     const pxr::GfVec2f ClippingRange{CameraDist / 100.f, CameraDist * 3.f};
 
-                    ImGui::SliderFloat("Focal Length (mm)", &m_CameraSettings.FocalLength_mm, 24.0, 300.0);
-                    ImGui::SliderFloat("Aperture (f-stop)", &m_CameraSettings.FStop, 1.0, 64.0, "%.3f", ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("Exposure", &m_CameraSettings.Exposure, -8.0, +8.0, "%.3f");
-                    ImGui::SliderFloat("Focus Distance", &m_CameraSettings.FocusDistance, ClippingRange[0], ClippingRange[1], "%.3f", ImGuiSliderFlags_AlwaysClamp);
-                    ImGui::SliderFloat("Sensor Width", &m_CameraSettings.SensorWidth_mm, 1, 100);
+                    ImGui::Combo("Projection", &m_CameraSettings.Projection,
+                                 "Perspective\0"
+                                 "Orthographic\0");
 
-                    ImGui::ScopedDisabler Disabler{true, 0.5f};
-                    ImGui::SliderFloat("Sensor Height", &m_CameraSettings.SensorHeight_mm, 1, 100);
+                    {
+                        ImGui::ScopedDisabler Disabler{m_CameraSettings.Projection != 0, 0.5f};
+                        ImGui::SliderFloat("Focal Length (mm)", &m_CameraSettings.FocalLength_mm, 24.0, 300.0);
+                        ImGui::SliderFloat("Aperture (f-stop)", &m_CameraSettings.FStop, 1.0, 64.0, "%.3f", ImGuiSliderFlags_Logarithmic);
+                        ImGui::SliderFloat("Focus Distance", &m_CameraSettings.FocusDistance, ClippingRange[0], ClippingRange[1], "%.3f", ImGuiSliderFlags_AlwaysClamp);
+                        ImGui::SliderFloat("Sensor Width", &m_CameraSettings.SensorWidth_mm, 1, 100);
+                    }
+
+                    {
+                        ImGui::ScopedDisabler Disabler{true, 0.5f};
+                        ImGui::SliderFloat("Sensor Height", &m_CameraSettings.SensorHeight_mm, 1, 100);
+                    }
+
+                    ImGui::SliderFloat("Exposure", &m_CameraSettings.Exposure, -8.0, +8.0, "%.3f");
 
                     ImGui::TreePop();
                 }
@@ -870,60 +885,53 @@ void USDViewer::UpdateUI()
                         UpdateFrameParams = true;
 
                     {
-                        std::array<const char*, static_cast<size_t>(PBR_Renderer::DebugViewType::NumDebugViews)> DebugViews;
+                        std::array<const char*, USD::HN_VIEW_MODE_COUNT> ViewModes;
 
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::None)]                 = "None";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Texcoord0)]            = "Tex coords 0";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Texcoord1)]            = "Tex coords 1";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::BaseColor)]            = "Base Color";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Transparency)]         = "Transparency";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Occlusion)]            = "Occlusion";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Emissive)]             = "Emissive";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Metallic)]             = "Metallic";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Roughness)]            = "Roughness";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::DiffuseColor)]         = "Diffuse color";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::SpecularColor)]        = "Specular color (R0)";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Reflectance90)]        = "Reflectance90";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::MeshNormal)]           = "Mesh normal";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::ShadingNormal)]        = "Shading normal";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::MotionVectors)]        = "Motion vectors";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::NdotV)]                = "n*v";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::PunctualLighting)]     = "Punctual Lighting";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::DiffuseIBL)]           = "Diffuse IBL";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::WhiteBaseColor)]       = "White Base Color";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::SpecularIBL)]          = "Specular IBL";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::ClearCoat)]            = "Clear Coat";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::ClearCoatFactor)]      = "Clear Coat Factor";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::ClearCoatRoughness)]   = "Clear Coat Roughness";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::ClearCoatNormal)]      = "Clear Coat Normal";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Sheen)]                = "Sheen";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::SheenColor)]           = "Sheen Color";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::SheenRoughness)]       = "Sheen Roughness";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::AnisotropyStrength)]   = "Anisotropy Strength";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::AnisotropyDirection)]  = "Anisotropy Direction";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Iridescence)]          = "Iridescence";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::IridescenceFactor)]    = "Iridescence Factor";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::IridescenceThickness)] = "Iridescence Thickness";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Transmission)]         = "Transmission";
-                        DebugViews[static_cast<size_t>(PBR_Renderer::DebugViewType::Thickness)]            = "Volume Thickness";
-                        static_assert(static_cast<size_t>(PBR_Renderer::DebugViewType::NumDebugViews) == 34, "Did you add a new debug view mode? You may want to handle it here");
+                        ViewModes[USD::HN_VIEW_MODE_SHADED]              = "Shaded";
+                        ViewModes[USD::HN_VIEW_MODE_TEXCOORD0]           = "Tex coords 0";
+                        ViewModes[USD::HN_VIEW_MODE_TEXCOORD1]           = "Tex coords 1";
+                        ViewModes[USD::HN_VIEW_MODE_BASE_COLOR]          = "Base Color";
+                        ViewModes[USD::HN_VIEW_MODE_TRANSPARENCY]        = "Transparency";
+                        ViewModes[USD::HN_VIEW_MODE_OCCLUSION]           = "Occlusion";
+                        ViewModes[USD::HN_VIEW_MODE_EMISSIVE]            = "Emissive";
+                        ViewModes[USD::HN_VIEW_MODE_METALLIC]            = "Metallic";
+                        ViewModes[USD::HN_VIEW_MODE_ROUGHNESS]           = "Roughness";
+                        ViewModes[USD::HN_VIEW_MODE_DIFFUSE_COLOR]       = "Diffuse color";
+                        ViewModes[USD::HN_VIEW_MODE_SPECULAR_COLOR]      = "Specular color (R0)";
+                        ViewModes[USD::HN_VIEW_MODE_REFLECTANCE90]       = "Reflectance90";
+                        ViewModes[USD::HN_VIEW_MODE_MESH_NORMAL]         = "Mesh normal";
+                        ViewModes[USD::HN_VIEW_MODE_SHADING_NORMAL]      = "Shading normal";
+                        ViewModes[USD::HN_VIEW_MODE_MOTION_VECTORS]      = "Motion vectors";
+                        ViewModes[USD::HN_VIEW_MODE_NDOTV]               = "n*v";
+                        ViewModes[USD::HN_VIEW_MODE_PUNCTUAL_LIGHTING]   = "Punctual Lighting";
+                        ViewModes[USD::HN_VIEW_MODE_DIFFUSE_IBL]         = "Diffuse IBL";
+                        ViewModes[USD::HN_VIEW_MODE_SPECULAR_IBL]        = "Specular IBL";
+                        ViewModes[USD::HN_VIEW_MODE_WHITE_BASE_COLOR]    = "White Base Color";
+                        ViewModes[USD::HN_VIEW_MODE_CLEARCOAT]           = "Clear Coat";
+                        ViewModes[USD::HN_VIEW_MODE_CLEARCOAT_FACTOR]    = "Clear Coat Factor";
+                        ViewModes[USD::HN_VIEW_MODE_CLEARCOAT_ROUGHNESS] = "Clear Coat Roughness";
+                        ViewModes[USD::HN_VIEW_MODE_CLEARCOAT_NORMAL]    = "Clear Coat Normal";
+                        ViewModes[USD::HN_VIEW_MODE_SCENE_DEPTH]         = "Scene Depth";
+                        ViewModes[USD::HN_VIEW_MODE_EDGE_MAP]            = "Edge Map";
+                        ViewModes[USD::HN_VIEW_MODE_MESH_ID]             = "Mesh ID";
+                        static_assert(USD::HN_VIEW_MODE_COUNT == 27, "Did you add a new view mode? You may want to handle it here");
 
-                        if (ImGui::Combo("Debug view", &m_Stage.DebugViewMode, DebugViews.data(), static_cast<int>(DebugViews.size()), 15))
+                        if (ImGui::Combo("View Mode", &m_Stage.ViewMode, ViewModes.data(), static_cast<int>(ViewModes.size()), 15))
                         {
-                            m_Stage.RenderDelegate->SetDebugView(static_cast<PBR_Renderer::DebugViewType>(m_Stage.DebugViewMode));
+                            m_Stage.RenderDelegate->SetViewMode(static_cast<USD::HN_VIEW_MODE>(m_Stage.ViewMode));
                         }
                     }
 
                     {
-                        std::array<const char*, static_cast<size_t>(USD::HN_RENDER_MODE_COUNT)> RenderModes;
-                        RenderModes[USD::HN_RENDER_MODE_SOLID]      = "Solid";
-                        RenderModes[USD::HN_RENDER_MODE_MESH_EDGES] = "Edges";
-                        RenderModes[USD::HN_RENDER_MODE_POINTS]     = "Points";
-                        static_assert(USD::HN_RENDER_MODE_COUNT == 3, "Did you add a new render mode? You may want to handle it here");
+                        std::array<const char*, static_cast<size_t>(USD::HN_GEOMETRY_MODE_COUNT)> GeometryModes;
+                        GeometryModes[USD::HN_GEOMETRY_MODE_SOLID]      = "Solid";
+                        GeometryModes[USD::HN_GEOMETRY_MODE_MESH_EDGES] = "Edges";
+                        GeometryModes[USD::HN_GEOMETRY_MODE_POINTS]     = "Points";
+                        static_assert(USD::HN_GEOMETRY_MODE_COUNT == 3, "Did you add a new geometry render mode? You may want to handle it here");
 
-                        if (ImGui::Combo("Render mode", &m_Stage.RenderMode, RenderModes.data(), static_cast<int>(RenderModes.size())))
+                        if (ImGui::Combo("Geometry mode", &m_Stage.GeometryMode, GeometryModes.data(), static_cast<int>(GeometryModes.size())))
                         {
-                            m_Stage.RenderDelegate->SetRenderMode(static_cast<USD::HN_RENDER_MODE>(m_Stage.RenderMode));
+                            m_Stage.RenderDelegate->SetGeometryMode(static_cast<USD::HN_GEOMETRY_MODE>(m_Stage.GeometryMode));
                         }
                     }
 
@@ -965,6 +973,9 @@ void USDViewer::UpdateUI()
 
                     if (ImGui::Checkbox("Shadows", &m_Stage.UseShadows))
                         m_Stage.RenderDelegate->SetUseShadows(m_Stage.UseShadows);
+
+                    if (ImGui::Checkbox("Use reverse depth", &m_FrameParams.UseReverseDepth))
+                        UpdateFrameParams = true;
 
                     ImGui::TreePop();
                 }
@@ -1232,8 +1243,6 @@ void USDViewer::UpdateUI()
         EditSelectedPrimTransform();
     }
 
-    if (UpdateRenderParams)
-        m_Stage.TaskManager->SetRenderRprimParams(m_RenderParams);
     if (UpdatePostProcessParams)
         m_Stage.TaskManager->SetPostProcessParams(m_PostProcessParams);
     if (UpdateFrameParams)
@@ -1253,20 +1262,40 @@ void USDViewer::UpdateCamera()
     const float4x4 USDCameraView = m_CameraView * float4x4::Scale(UnitsPerMeter, UnitsPerMeter, -UnitsPerMeter);
 
     const SwapChainDesc& SCDesc      = m_pSwapChain->GetDesc();
-    m_CameraSettings.SensorHeight_mm = m_CameraSettings.SensorWidth_mm / static_cast<float>(SCDesc.Width) * static_cast<float>(SCDesc.Height);
+    const float          AspectRatio = static_cast<float>(SCDesc.Height) / static_cast<float>(SCDesc.Width);
+    m_CameraSettings.SensorHeight_mm = m_CameraSettings.SensorWidth_mm * AspectRatio;
     const float        FOV           = 2.0f * atanf(m_CameraSettings.SensorHeight_mm / (2.0 * m_CameraSettings.FocalLength_mm));
-    const pxr::GfVec2f ClippingRange{CameraDist / 100.f, CameraDist * 3.f};
-    // Get projection matrix adjusted to the current screen orientation
-    m_CameraProj = GetAdjustedProjectionMatrix(FOV, ClippingRange[0], ClippingRange[1]);
+    const pxr::GfVec2f ClippingRangeMeters{CameraDist / 100.f, CameraDist * 3.f};
 
-    m_CameraSettings.FocusDistance = clamp(m_CameraSettings.FocusDistance, ClippingRange[0] + m_CameraSettings.FocalLength_mm * 0.001f, ClippingRange[1]);
+    const float MillimetersPerUnit = m_Stage.MetersPerUnit * 1000.f;
+
+    float HorzApertureUnits = 0;
+    float VertApertureUnits = 0;
+    if (m_CameraSettings.Projection == 0)
+    {
+        HorzApertureUnits = m_CameraSettings.SensorWidth_mm / MillimetersPerUnit;
+        VertApertureUnits = m_CameraSettings.SensorHeight_mm / MillimetersPerUnit;
+
+        m_CameraProj = GetAdjustedProjectionMatrix(FOV, ClippingRangeMeters[0], ClippingRangeMeters[1]);
+        m_Stage.Camera.GetProjectionAttr().Set(pxr::UsdGeomTokens->perspective);
+    }
+    else
+    {
+        HorzApertureUnits = 0.5 * ClippingRangeMeters[1] / m_Stage.MetersPerUnit;
+        VertApertureUnits = HorzApertureUnits * AspectRatio;
+
+        m_CameraProj = float4x4::Ortho(HorzApertureUnits * m_Stage.MetersPerUnit, VertApertureUnits * m_Stage.MetersPerUnit, ClippingRangeMeters[0], ClippingRangeMeters[1], false);
+        m_Stage.Camera.GetProjectionAttr().Set(pxr::UsdGeomTokens->orthographic);
+    }
+
+    m_CameraSettings.FocusDistance = clamp(m_CameraSettings.FocusDistance, ClippingRangeMeters[0] + m_CameraSettings.FocalLength_mm * 0.001f, ClippingRangeMeters[1]);
 
     m_Stage.Camera.MakeMatrixXform().Set(USD::ToGfMatrix4d((m_Stage.RootTransform * USDCameraView).Inverse()));
     m_Stage.Camera.GetFStopAttr().Set(m_CameraSettings.FStop);
     m_Stage.Camera.GetExposureAttr().Set(m_CameraSettings.Exposure);
 
     // USD camera properties are measured in scene units
-    m_Stage.Camera.GetClippingRangeAttr().Set(ClippingRange / m_Stage.MetersPerUnit);
+    m_Stage.Camera.GetClippingRangeAttr().Set(ClippingRangeMeters / m_Stage.MetersPerUnit);
     m_Stage.Camera.GetFocusDistanceAttr().Set(m_CameraSettings.FocusDistance / m_Stage.MetersPerUnit);
 
     // By an odd convention, lens and filmback properties are measured in tenths of a scene unit rather than "raw" scene units.
@@ -1277,18 +1306,16 @@ void USDViewer::UpdateCamera()
     //      float focalLength;
     //      UsdCamera.GetFocalLengthAttr().Get(&focalLength); // focalLength == 30
     // However
-    //      focalLength = SceneDelegate->GetCameraParamValue(id, HdCameraTokens->focalLength).Get<float>(); //  focalLength == 3
-
+    //      focalLength = SceneDelegate->GetCameraParamValue(id, HdCameraTokens->focalLength).Get<float>(); //  focalLength ==
     constexpr float UsdCamLensUnitScale = 10;
-    const float     MillimetersPerUnit  = m_Stage.MetersPerUnit * 1000.f;
+
     m_Stage.Camera.GetFocalLengthAttr().Set(m_CameraSettings.FocalLength_mm * UsdCamLensUnitScale / MillimetersPerUnit);
-    m_Stage.Camera.GetHorizontalApertureAttr().Set(m_CameraSettings.SensorWidth_mm * UsdCamLensUnitScale / MillimetersPerUnit);
-    m_Stage.Camera.GetVerticalApertureAttr().Set(m_CameraSettings.SensorHeight_mm * UsdCamLensUnitScale / MillimetersPerUnit);
+    m_Stage.Camera.GetHorizontalApertureAttr().Set(HorzApertureUnits * UsdCamLensUnitScale);
+    m_Stage.Camera.GetVerticalApertureAttr().Set(VertApertureUnits * UsdCamLensUnitScale);
 }
 
-void USDViewer::Update(double CurrTime, double ElapsedTime)
+void USDViewer::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
     m_Camera.SetZoomSpeed(m_Camera.GetDist() * 0.1f);
     m_Camera.Update(m_InputController);
     UpdateCamera();
@@ -1301,8 +1328,8 @@ void USDViewer::Update(double CurrTime, double ElapsedTime)
             m_Stage.Animation.Time = m_Stage.Animation.StartTime;
     }
 
-    // Update camera first as TRS widget needs camera view/proj matrices.
-    UpdateUI();
+    // Update camera before updating UI as TRS widget needs camera view/proj matrices.
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     if (LastAnimationTime != m_Stage.Animation.Time)
     {

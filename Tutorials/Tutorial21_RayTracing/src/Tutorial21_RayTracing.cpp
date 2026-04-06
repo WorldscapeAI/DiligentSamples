@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2024 Diligent Graphics LLC
+ *  Copyright 2019-2025 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +35,6 @@
 #include "ImGuiUtils.hpp"
 #include "AdvancedMath.hpp"
 #include "PlatformMisc.hpp"
-#include "../../Common/src/TexturedCube.hpp"
 
 namespace Diligent
 {
@@ -283,13 +282,13 @@ void Tutorial21_RayTracing::LoadTextures()
 
         std::stringstream FileNameSS;
         FileNameSS << "DGLogo" << tex << ".png";
-        auto FileName = FileNameSS.str();
+        std::string FileName = FileNameSS.str();
         CreateTextureFromFile(FileName.c_str(), loadInfo, m_pDevice, &pTex[tex]);
 
         // Get shader resource view from the texture
-        auto* pTextureSRV = pTex[tex]->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
-        pTexSRVs[tex]     = pTextureSRV;
-        Barriers[tex]     = StateTransitionDesc{pTex[tex], RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_SHADER_RESOURCE, STATE_TRANSITION_FLAG_UPDATE_STATE};
+        ITextureView* pTextureSRV = pTex[tex]->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE);
+        pTexSRVs[tex]             = pTextureSRV;
+        Barriers[tex]             = StateTransitionDesc{pTex[tex], RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_SHADER_RESOURCE, STATE_TRANSITION_FLAG_UPDATE_STATE};
     }
     m_pImmediateContext->TransitionResourceStates(_countof(Barriers), Barriers);
 
@@ -305,22 +304,35 @@ void Tutorial21_RayTracing::LoadTextures()
 
 void Tutorial21_RayTracing::CreateCubeBLAS()
 {
+    RefCntAutoPtr<IDataBlob> pCubeVerts;
+    RefCntAutoPtr<IDataBlob> pCubeIndices;
+    GeometryPrimitiveInfo    CubeGeoInfo;
+    constexpr float          CubeSize = 2.f;
+    CreateGeometryPrimitive(CubeGeometryPrimitiveAttributes{CubeSize, GEOMETRY_PRIMITIVE_VERTEX_FLAG_ALL}, &pCubeVerts, &pCubeIndices, &CubeGeoInfo);
+
+    struct CubeVertex
+    {
+        float3 Pos;
+        float3 Normal;
+        float2 UV;
+    };
+    VERIFY_EXPR(CubeGeoInfo.VertexSize == sizeof(CubeVertex));
+    const CubeVertex* pVerts   = pCubeVerts->GetConstDataPtr<CubeVertex>();
+    const Uint32*     pIndices = pCubeIndices->GetConstDataPtr<Uint32>();
+
     // Create a buffer with cube attributes.
     // These attributes will be used in the hit shader to calculate UVs and normal for intersection point.
     {
         HLSL::CubeAttribs Attribs;
-        for (Uint32 v = 0; v < TexturedCube::NumVertices; ++v)
+        for (Uint32 v = 0; v < CubeGeoInfo.NumVertices; ++v)
         {
-            const auto& UV{TexturedCube::Texcoords[v]};
-            Attribs.UVs[v] = {UV.x, UV.y, 0, 0};
+            Attribs.UVs[v]     = {pVerts[v].UV, 0, 0};
+            Attribs.Normals[v] = pVerts[v].Normal;
         }
 
-        for (Uint32 v = 0; v < TexturedCube::NumVertices; ++v)
-            Attribs.Normals[v] = TexturedCube::Normals[v];
-
-        for (Uint32 i = 0; i < TexturedCube::Indices.size(); i += 3)
+        for (Uint32 i = 0; i < CubeGeoInfo.NumIndices; i += 3)
         {
-            const auto* TriIdx{&TexturedCube::Indices[i]};
+            const Uint32* TriIdx{&pIndices[i]};
             Attribs.Primitives[i / 3] = uint4{TriIdx[0], TriIdx[1], TriIdx[2], 0};
         }
 
@@ -338,13 +350,14 @@ void Tutorial21_RayTracing::CreateCubeBLAS()
         m_pRayTracingSRB->GetVariableByName(SHADER_TYPE_RAY_CLOSEST_HIT, "g_CubeAttribsCB")->Set(m_CubeAttribsCB);
     }
 
-    // Create vertex buffer
-    auto pCubeVertexBuffer = TexturedCube::CreateVertexBuffer(m_pDevice, TexturedCube::VERTEX_COMPONENT_FLAG_POSITION, BIND_RAY_TRACING);
-    VERIFY_EXPR(pCubeVertexBuffer != nullptr);
-
-    // Create index buffer
-    auto pCubeIndexBuffer = TexturedCube::CreateIndexBuffer(m_pDevice, BIND_RAY_TRACING);
-    VERIFY_EXPR(pCubeIndexBuffer != nullptr);
+    // Create vertex and index buffers
+    RefCntAutoPtr<IBuffer>             pCubeVertexBuffer;
+    RefCntAutoPtr<IBuffer>             pCubeIndexBuffer;
+    GeometryPrimitiveBuffersCreateInfo CubeBuffersCI;
+    CubeBuffersCI.VertexBufferBindFlags = BIND_RAY_TRACING;
+    CubeBuffersCI.IndexBufferBindFlags  = BIND_RAY_TRACING;
+    CreateGeometryPrimitiveBuffers(m_pDevice, CubeGeometryPrimitiveAttributes{CubeSize, GEOMETRY_PRIMITIVE_VERTEX_FLAG_POSITION},
+                                   &CubeBuffersCI, &pCubeVertexBuffer, &pCubeIndexBuffer);
 
     // Create & build bottom level acceleration structure
     {
@@ -352,10 +365,10 @@ void Tutorial21_RayTracing::CreateCubeBLAS()
         BLASTriangleDesc Triangles;
         {
             Triangles.GeometryName         = "Cube";
-            Triangles.MaxVertexCount       = TexturedCube::NumVertices;
+            Triangles.MaxVertexCount       = CubeGeoInfo.NumVertices;
             Triangles.VertexValueType      = VT_FLOAT32;
             Triangles.VertexComponentCount = 3;
-            Triangles.MaxPrimitiveCount    = TexturedCube::NumIndices / 3;
+            Triangles.MaxPrimitiveCount    = CubeGeoInfo.NumIndices / 3;
             Triangles.IndexType            = VT_UINT32;
 
             BottomLevelASDesc ASDesc;
@@ -788,8 +801,8 @@ void Tutorial21_RayTracing::Render()
 
     // Update constants
     {
-        float3 CameraWorldPos = float3::MakeVector(m_Camera.GetWorldMatrix()[3]);
-        auto   CameraViewProj = m_Camera.GetViewMatrix() * m_Camera.GetProjMatrix();
+        float3   CameraWorldPos = float3::MakeVector(m_Camera.GetWorldMatrix()[3]);
+        float4x4 CameraViewProj = m_Camera.GetViewMatrix() * m_Camera.GetProjMatrix();
 
         m_Constants.CameraPos   = float4{CameraWorldPos, 1.0f};
         m_Constants.InvViewProj = CameraViewProj.Inverse();
@@ -816,7 +829,7 @@ void Tutorial21_RayTracing::Render()
     {
         m_pImageBlitSRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_Texture")->Set(m_pColorRT->GetDefaultView(TEXTURE_VIEW_SHADER_RESOURCE));
 
-        auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+        ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
         m_pImmediateContext->SetRenderTargets(1, &pRTV, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
         m_pImmediateContext->SetPipelineState(m_pImageBlitPSO);
@@ -826,10 +839,9 @@ void Tutorial21_RayTracing::Render()
     }
 }
 
-void Tutorial21_RayTracing::Update(double CurrTime, double ElapsedTime)
+void Tutorial21_RayTracing::Update(double CurrTime, double ElapsedTime, bool DoUpdateUI)
 {
-    SampleBase::Update(CurrTime, ElapsedTime);
-    UpdateUI();
+    SampleBase::Update(CurrTime, ElapsedTime, DoUpdateUI);
 
     if (m_Animate)
     {
@@ -839,7 +851,7 @@ void Tutorial21_RayTracing::Update(double CurrTime, double ElapsedTime)
     m_Camera.Update(m_InputController, static_cast<float>(ElapsedTime));
 
     // Do not allow going underground
-    auto oldPos = m_Camera.GetPos();
+    float3 oldPos = m_Camera.GetPos();
     if (oldPos.y < -5.7f)
     {
         oldPos.y = -5.7f;

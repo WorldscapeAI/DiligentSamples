@@ -9,7 +9,7 @@ and how to render a simple triangle.
 
 ## Shaders
 
-This tutotial uses very basic shaders. The vertex shader generates a procedural triangle. It uses an array of hard-coded
+This tutorial uses very basic shaders. The vertex shader generates a procedural triangle. It uses an array of hard-coded
 vertex positions in screen space and assigns red, green and blue colors to the vertices. The shader uses system-generated
 vertex id as an array index.
 
@@ -37,7 +37,7 @@ void main(in  uint    VertId : SV_VertexID,
     PSIn.Color = Col[VertId];
 }
 ```
-The shader is written in HLSL. Diligent Engine uses shader source code converter to translate HLSL
+The shader is written in HLSL. Diligent Engine uses a shader source code converter to translate HLSL
 into GLSL when needed. It can also use shaders authored in GLSL, but there is no GLSL to HLSL converter.
 
 Pixel (fragment) shader simply interpolates vertex colors and is also written in HLSL:
@@ -181,8 +181,8 @@ Before rendering anything on the screen we want to clear it:
 
 ```cpp
 const float ClearColor[] = {  0.350f,  0.350f,  0.350f, 1.0f }; 
-auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
-auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
+ITextureView* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
+ITextureView* pDSV = m_pSwapChain->GetDepthBufferDSV();
 m_pImmediateContext->ClearRenderTarget(pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 m_pImmediateContext->ClearDepthStencil(pDSV, CLEAR_DEPTH_FLAG, 1.f, 0,
                                        RESOURCE_STATE_TRANSITION_MODE_TRANSITION);

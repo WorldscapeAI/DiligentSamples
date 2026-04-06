@@ -114,7 +114,7 @@ elseif(PLATFORM_TVOS)
         include/SampleApp.hpp
     )
 
-elseif(PLATFORM_EMSCRIPTEN)
+elseif(PLATFORM_WEB)
     set(SOURCE
         src/Emscripten/InputControllerEmscripten.cpp
         src/Emscripten/SampleAppEmscripten.cpp
@@ -132,7 +132,8 @@ elseif(PLATFORM_EMSCRIPTEN)
            TARGET_NAME STREQUAL "Shadows" OR
            TARGET_NAME STREQUAL "Tutorial14_ComputeShader" OR
            TARGET_NAME STREQUAL "Tutorial16_BindlessResources" OR
-           TARGET_NAME STREQUAL "Tutorial26_StateCache")
+           TARGET_NAME STREQUAL "Tutorial26_StateCache" OR
+           TARGET_NAME STREQUAL "Tutorial29_OIT")
             set(DILIGENT_DISABLE_WEBGL "disabled")
         endif()
 
@@ -148,11 +149,6 @@ elseif(PLATFORM_EMSCRIPTEN)
             ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}.html
             @ONLY
         )
-
-        target_link_options(${TARGET_NAME} PRIVATE "SHELL: -s WASM_BIGINT -s WASM=1")
-        if(${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND DILIGENT_EMSCRIPTEN_STRIP_DEBUG_INFO)
-            target_link_options(${TARGET_NAME} PRIVATE "SHELL: -gseparate-dwarf -g0")
-        endif()
     endfunction()
     
 else()
