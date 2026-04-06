@@ -46,6 +46,20 @@ namespace Diligent
 
 class ImGuiImplDiligent;
 
+struct RenderPerfStats
+{
+    double gpu_frame_time_ms;
+    double cpu_frame_time_ms;
+
+    int draw_calls;
+    int index_draw_calls;
+    int instanced_draw_calls;
+
+    int triangles_rendered;
+    int lines_rendered;
+    int points_rendered;
+};
+
 class SampleApp : public NativeAppBase
 {
 public:
@@ -85,6 +99,11 @@ public:
     {
         VERIFY_EXPR(Ind < m_NumImmediateContexts);
         return m_pDeviceContexts[Ind];
+    }
+
+    virtual AppPerfStats GetAppPerfStats() const override final
+    {
+        return m_AppPerfStats;
     }
 
 protected:
@@ -159,6 +178,11 @@ protected:
     GoldenImageMode m_GoldenImgMode           = GoldenImageMode::None;
     int             m_GoldenImgPixelTolerance = 0;
     int             m_ExitCode                = 0;
+
+    AppPerfStats    m_AppPerfStats;
+	RenderPerfStats m_RenderPerfStats;
+    RefCntAutoPtr<IQuery> m_pGPUTimeStampQuery;
+    QueryDataDuration m_GPUTimeStamp;
 };
 
 } // namespace Diligent

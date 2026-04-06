@@ -70,6 +70,8 @@ enum class InputKeys
     MoveBackward,
     MoveUp,
     MoveDown,
+    RollClockwise,
+	RollCounterClockwise,
     Reset,
     ControlDown,
     ShiftDown,
@@ -87,9 +89,129 @@ enum INPUT_KEY_STATE_FLAGS : Uint8
 };
 DEFINE_FLAG_ENUM_OPERATORS(INPUT_KEY_STATE_FLAGS)
 
+enum class KeyboardAction { Key_Up, Key_Down};
+
+enum class KeyboardKey
+{
+    Unknown = -1,
+    Key_0 = 0,
+    Key_1,
+    Key_2,
+    Key_3,
+    Key_4,
+    Key_5,
+    Key_6,
+    Key_7,
+    Key_8,
+    Key_9,
+
+    Key_A,
+    Key_B,
+    Key_C,
+    Key_D,
+    Key_E,
+    Key_F,
+    Key_G,
+    Key_H,
+    Key_I,
+    Key_J,
+    Key_K,
+    Key_L,
+    Key_M,
+    Key_N,
+    Key_O,
+    Key_P,
+    Key_Q,
+    Key_R,
+    Key_S,
+    Key_T,
+    Key_U,
+    Key_V,
+    Key_W,
+    Key_X,
+    Key_Y,
+    Key_Z,
+    
+    Key_LEFT,
+    Key_UP,    
+    Key_RIGHT,
+    Key_DOWN,
+    Key_TAB,   
+    Key_RETURN,
+    Key_SHIFT,
+    Key_CONTROL,
+
+    Key_CAPITAL,
+    Key_ESCAPE,
+
+    Key_SPACE,
+    Key_PAGEUP,	
+    Key_PAGEDOWN,
+    Key_HOME,
+    Key_END,   
+
+    Key_NUMPAD0,
+    Key_NUMPAD1,
+    Key_NUMPAD2,
+    Key_NUMPAD3,
+    Key_NUMPAD4,
+    Key_NUMPAD5,
+    Key_NUMPAD6,
+    Key_NUMPAD7,
+    Key_NUMPAD8,
+    Key_NUMPAD9,
+
+    Key_MULTIPLY,
+    Key_ADD,
+    Key_SEPARATOR,
+    Key_SUBTRACT,
+    Key_DECIMAL,
+    Key_DIVIDE,
+    Key_F1,
+    Key_F2,
+    Key_F3,
+    Key_F4,
+    Key_F5,
+    Key_F6,
+    Key_F7,
+    Key_F8,
+    Key_F9,
+    Key_F10,	
+    Key_F11,
+    Key_F12,
+
+    Key_LSHIFT,
+    Key_RSHIFT,
+    Key_LCONTROL,
+    Key_RCONTROL,
+    TotalKeys
+};
+
+enum KEYBOARD_STATE_FLAGS : Uint8
+{
+    KEYBOARD_STATE_FLAGS_KEY_INVALID    = 0x00,
+    KEYBOARD_STATE_FLAGS_KEY_DOWN       = 0x01,
+    KEYBOARD_STATE_FLAGS_KEY_FALLING    = 0x03,
+    KEYBOARD_STATE_FLAGS_KEY_UP         = 0x10,
+    KEYBOARD_STATE_FLAGS_KEY_RISING     = 0x30
+};
+
 class InputControllerBase
 {
 public:
+
+    InputControllerBase()
+    {
+       for (int keyboardIdx = 0; keyboardIdx != static_cast<size_t>(KeyboardKey::TotalKeys); ++keyboardIdx)
+        {
+            m_KeyboardKeys[static_cast<size_t>(keyboardIdx)] = KEYBOARD_STATE_FLAGS::KEYBOARD_STATE_FLAGS_KEY_UP;
+            m_LastFrameKeyboardKeys[static_cast<size_t>(keyboardIdx)] = KEYBOARD_STATE_FLAGS::KEYBOARD_STATE_FLAGS_KEY_UP;
+            m_KeyboardKeyFramesRepeated[static_cast<size_t>(keyboardIdx)] = 0;
+            m_KeyboardKeyTimestampSwitch[static_cast<size_t>(keyboardIdx)] = 0.0;
+        }
+    }
+
+
     const MouseState& GetMouseState() const
     {
         return m_MouseState;
@@ -105,6 +227,22 @@ public:
         return (GetKeyState(Key) & INPUT_KEY_STATE_FLAG_KEY_IS_DOWN) != 0;
     }
 
+    KEYBOARD_STATE_FLAGS GetKeyboardState(KeyboardKey Key) const
+    {
+        return m_KeyboardKeys[static_cast<size_t>(Key)];
+    }
+
+    Uint8 GetKeyboardRepeat(KeyboardKey Key) const
+    {
+        return m_KeyboardKeyFramesRepeated[static_cast<size_t>(Key)];
+    }
+
+    double GetKeyboardSwitchTimestamp(KeyboardKey Key) const
+    {
+        return m_KeyboardKeyTimestampSwitch[static_cast<size_t>(Key)];
+    }
+
+
     void ClearState()
     {
         m_MouseState.WheelDelta = 0;
@@ -118,10 +256,45 @@ public:
             }
         }
     }
+    
+    void Update(const double current_time)
+    {
+        for(int keyboardIdx = 0; keyboardIdx != static_cast<size_t>(KeyboardKey::TotalKeys); ++keyboardIdx)
+        {
+            if(m_KeyboardKeys[keyboardIdx] == m_LastFrameKeyboardKeys[keyboardIdx])
+            {
+                if(m_KeyboardKeyFramesRepeated[keyboardIdx] != USHRT_MAX)
+                    ++m_KeyboardKeyFramesRepeated[keyboardIdx];
+            }
+            else
+            {
+                m_KeyboardKeyTimestampSwitch[keyboardIdx] = current_time;
+            }
+        }
+
+        for (int keyboardIdx = 0; keyboardIdx != static_cast<size_t>(KeyboardKey::TotalKeys); ++keyboardIdx)
+        {
+            m_LastFrameKeyboardKeys[keyboardIdx] = m_KeyboardKeys[keyboardIdx];
+            
+            if (m_KeyboardKeys[keyboardIdx] == KEYBOARD_STATE_FLAGS_KEY_FALLING)
+            {
+                m_KeyboardKeys[keyboardIdx] = KEYBOARD_STATE_FLAGS_KEY_DOWN;
+            }
+            if (m_KeyboardKeys[keyboardIdx] == KEYBOARD_STATE_FLAGS_KEY_RISING)
+            {
+                m_KeyboardKeys[keyboardIdx] = KEYBOARD_STATE_FLAGS_KEY_UP;
+            }
+        }
+    }
 
 protected:
     MouseState            m_MouseState;
     INPUT_KEY_STATE_FLAGS m_Keys[static_cast<size_t>(InputKeys::TotalKeys)] = {};
+
+    KEYBOARD_STATE_FLAGS  m_KeyboardKeys[static_cast<size_t>(KeyboardKey::TotalKeys)] = {};
+    KEYBOARD_STATE_FLAGS  m_LastFrameKeyboardKeys[static_cast<size_t>(KeyboardKey::TotalKeys)] = {};
+    double                m_KeyboardKeyTimestampSwitch[static_cast<size_t>(KeyboardKey::TotalKeys)] = {};
+    Uint8                 m_KeyboardKeyFramesRepeated[static_cast<size_t>(KeyboardKey::TotalKeys)] = {};
 };
 
 } // namespace Diligent

@@ -522,6 +522,12 @@ void SampleApp::InitializeDiligentEngine(const NativeWindow* pWindow)
 
         m_pScreenCapture.reset(new ScreenCapture(m_pDevice));
     }
+
+    // Create the GPU Query so we can get the exact GPU time for each frame
+    QueryDesc gpu_timestamp;
+    gpu_timestamp.Name = "GPU Timestamp Query";
+    gpu_timestamp.Type = QUERY_TYPE_DURATION;
+    m_pDevice->CreateQuery(gpu_timestamp, &m_pGPUTimeStampQuery);
 }
 
 void SampleApp::InitializeSample()
@@ -836,6 +842,12 @@ SampleApp::CommandLineStatus SampleApp::ProcessCommandLine(int argc, const char*
 
     if (m_DeviceType == RENDER_DEVICE_TYPE_UNDEFINED)
     {
+        // If the device type was not specified on the command line,
+        // hardcode to D3D11 for now. The code below pops up a selection dialog,
+		// but most of the options are untested and may not work properly.
+        m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+
+#if FALSE
         SelectDeviceType();
         if (m_DeviceType == RENDER_DEVICE_TYPE_UNDEFINED)
         {
@@ -851,6 +863,7 @@ SampleApp::CommandLineStatus SampleApp::ProcessCommandLine(int argc, const char*
             m_DeviceType = RENDER_DEVICE_TYPE_WEBGPU;
 #endif
         }
+#endif
     }
 
     return m_TheSample->ProcessCommandLine(ArgsParser.ArgC(), ArgsParser.ArgV());
@@ -897,6 +910,7 @@ void SampleApp::Render()
 
     auto* pCtx = GetImmediateContext();
     pCtx->ClearStats();
+    pCtx->BeginQuery(m_pGPUTimeStampQuery);
 
     auto* pRTV = m_pSwapChain->GetCurrentBackBufferRTV();
     auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
@@ -1084,6 +1098,8 @@ void SampleApp::Present()
         }
     }
 
+    pCtx->EndQuery(m_pGPUTimeStampQuery);
+
     m_pSwapChain->Present(m_bVSync ? 1 : 0);
 
     if (m_pScreenCapture)
@@ -1123,6 +1139,21 @@ void SampleApp::Present()
             m_pScreenCapture->RecycleStagingTexture(std::move(Capture.pTexture));
         }
     }
+
+    while (m_pGPUTimeStampQuery->GetData(&m_GPUTimeStamp, sizeof(QueryDataTimestamp)) == false)
+    {
+        //std::cout<<"Waiting for GPU Query to complete\n";
+    };
+
+    DeviceContextStats stats = pCtx->GetStats();
+
+    m_RenderPerfStats.draw_calls            = stats.CommandCounters.Draw + stats.CommandCounters.DrawMesh + stats.CommandCounters.MultiDraw;
+    m_RenderPerfStats.index_draw_calls      = stats.CommandCounters.DrawIndexed + stats.CommandCounters.DrawIndexedIndirect + stats.CommandCounters.DrawIndirect + stats.CommandCounters.DrawMeshIndirect + stats.CommandCounters.MultiDrawIndexed;
+    m_RenderPerfStats.triangles_rendered    = stats.GetTotalTriangleCount();
+    m_RenderPerfStats.gpu_frame_time_ms     = ((double)m_GPUTimeStamp.Duration / (double)m_GPUTimeStamp.Frequency) * 1000.0;
+    // Copy our stats over for the title bar
+    m_AppPerfStats.gpu_time_ms              = m_RenderPerfStats.gpu_frame_time_ms;
+    //std::cout << "Triangles: " << m_RenderPerfStats.triangles_rendered << " DrawCalls: "<< m_RenderPerfStats.draw_calls << " IndexDrawCalls: " << m_RenderPerfStats.index_draw_calls << std::endl;
 }
 
 } // namespace Diligent

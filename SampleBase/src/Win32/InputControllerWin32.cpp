@@ -72,7 +72,13 @@ InputKeys MapCameraKeyWnd(UINT nKey)
         case 'Q':
             return InputKeys::MoveDown; // pgdn
 
-        case VK_HOME:
+        case 'Z':
+            return InputKeys::RollCounterClockwise;
+
+        case 'C':
+            return InputKeys::RollClockwise;
+
+    	case VK_HOME:
             return InputKeys::Reset;
 
         case VK_ADD:
@@ -83,6 +89,275 @@ InputKeys MapCameraKeyWnd(UINT nKey)
 
         default:
             return InputKeys::Unknown;
+    }
+}
+
+KeyboardKey WindowsKeyToKeyboardKey(UINT virtualKey)
+{
+    switch (virtualKey)
+    {
+    case 0x30:
+        return KeyboardKey::Key_0;
+        break;
+    case 0x31:
+        return KeyboardKey::Key_1;
+        break;
+    case 0x32:
+        return KeyboardKey::Key_2;
+        break;
+    case 0x33:
+        return KeyboardKey::Key_3;
+        break;
+    case 0x34:
+        return KeyboardKey::Key_4;
+        break;
+    case 0x35:
+        return KeyboardKey::Key_5;
+        break;
+    case 0x36:
+        return KeyboardKey::Key_6;
+        break;
+    case 0x37:
+        return KeyboardKey::Key_7;
+        break;
+    case 0x38:
+        return KeyboardKey::Key_8;
+        break;
+    case 0x39:
+        return KeyboardKey::Key_9;
+        break;
+
+    case 0x41:
+        return KeyboardKey::Key_A;
+        break;
+    case 0x42:
+        return KeyboardKey::Key_B;
+        break;
+    case 0x43:
+        return KeyboardKey::Key_C;
+        break;
+    case 0x44:
+        return KeyboardKey::Key_D;
+        break;
+    case 0x45:
+        return KeyboardKey::Key_E;
+        break;
+    case 0x46:
+        return KeyboardKey::Key_F;
+        break;
+    case 0x47:
+        return KeyboardKey::Key_G;
+        break;
+    case 0x48:
+        return KeyboardKey::Key_H;
+        break;
+    case 0x49:
+        return KeyboardKey::Key_I;
+        break;
+    case 0x4A:
+        return KeyboardKey::Key_J;
+        break;
+    case 0x4B:
+        return KeyboardKey::Key_K;
+        break;
+    case 0x4C:
+        return KeyboardKey::Key_L;
+        break;
+    case 0x4D:
+        return KeyboardKey::Key_M;
+        break;
+    case 0x4E:
+        return KeyboardKey::Key_N;
+        break;
+    case 0x4F:
+        return KeyboardKey::Key_O;
+        break;
+    case 0x50:
+        return KeyboardKey::Key_P;
+        break;
+    case 0x51:
+        return KeyboardKey::Key_Q;
+        break;
+    case 0x52:
+        return KeyboardKey::Key_R;
+        break;
+    case 0x53:
+        return KeyboardKey::Key_S;
+        break;
+    case 0x54:
+        return KeyboardKey::Key_T;
+        break;
+    case 0x55:
+        return KeyboardKey::Key_U;
+        break;
+    case 0x56:
+        return KeyboardKey::Key_V;
+        break;
+    case 0x57:
+        return KeyboardKey::Key_W;
+        break;
+    case 0x58:
+        return KeyboardKey::Key_X;
+        break;
+    case 0x59:
+        return KeyboardKey::Key_Y;
+        break;
+    case 0x5A:
+        return KeyboardKey::Key_Z;
+        break;
+
+    case VK_LEFT:
+        return KeyboardKey::Key_LEFT;
+        break;
+    case VK_UP:
+        return KeyboardKey::Key_UP;
+        break;
+    case VK_RIGHT:
+        return KeyboardKey::Key_RIGHT;
+        break;
+    case VK_DOWN:
+        return KeyboardKey::Key_DOWN;
+        break;
+    case VK_TAB:
+        return KeyboardKey::Key_TAB;
+        break;
+    case VK_RETURN:
+        return KeyboardKey::Key_RETURN;
+        break;
+    case VK_SHIFT:
+        return KeyboardKey::Key_SHIFT;
+        break;
+    case VK_CONTROL:
+        return KeyboardKey::Key_CONTROL;
+        break;
+
+    case VK_SPACE:
+        return KeyboardKey::Key_SPACE;
+        break;
+    case VK_PRIOR:
+        return KeyboardKey::Key_PAGEUP;
+        break;
+    case VK_NEXT:
+        return KeyboardKey::Key_PAGEDOWN;
+        break;
+    case VK_END:
+        return KeyboardKey::Key_END;
+        break;
+    case VK_HOME:
+        return KeyboardKey::Key_HOME;
+        break;
+    case VK_CAPITAL:
+        return KeyboardKey::Key_CAPITAL;
+        break;
+    case VK_ESCAPE:
+        return KeyboardKey::Key_ESCAPE;
+        break;
+
+    case VK_NUMPAD0:
+        return KeyboardKey::Key_NUMPAD0;
+        break;
+    case VK_NUMPAD1:
+        return KeyboardKey::Key_NUMPAD1;
+        break;
+    case VK_NUMPAD2:
+        return KeyboardKey::Key_NUMPAD2;
+        break;
+    case VK_NUMPAD3:
+        return KeyboardKey::Key_NUMPAD3;
+        break;
+    case VK_NUMPAD4:
+        return KeyboardKey::Key_NUMPAD4;
+        break;
+    case VK_NUMPAD5:
+        return KeyboardKey::Key_NUMPAD5;
+        break;
+    case VK_NUMPAD6:
+        return KeyboardKey::Key_NUMPAD6;
+        break;
+    case VK_NUMPAD7:
+        return KeyboardKey::Key_NUMPAD7;
+        break;
+    case VK_NUMPAD8:
+        return KeyboardKey::Key_NUMPAD8;
+        break;
+    case VK_NUMPAD9:
+        return KeyboardKey::Key_NUMPAD9;
+        break;
+
+
+    case VK_F1:
+        return KeyboardKey::Key_F1;
+        break;
+    case VK_F2:
+        return KeyboardKey::Key_F2;
+        break;
+    case VK_F3:
+        return KeyboardKey::Key_F3;
+        break;
+    case VK_F4:
+        return KeyboardKey::Key_F4;
+        break;
+    case VK_F5:
+        return KeyboardKey::Key_F5;
+        break;
+    case VK_F6:
+        return KeyboardKey::Key_F6;
+        break;
+    case VK_F7:
+        return KeyboardKey::Key_F7;
+        break;
+    case VK_F8:
+        return KeyboardKey::Key_F8;
+        break;
+    case VK_F9:
+        return KeyboardKey::Key_F9;
+        break;
+    case VK_F10:
+        return KeyboardKey::Key_F10;
+        break;
+    case VK_F11:
+        return KeyboardKey::Key_F11;
+        break;
+    case VK_F12:
+        return KeyboardKey::Key_F12;
+        break;
+
+    case VK_MULTIPLY:
+        return KeyboardKey::Key_MULTIPLY;
+        break;
+    case VK_ADD:
+        return KeyboardKey::Key_ADD;
+        break;
+    case VK_SEPARATOR:
+        return KeyboardKey::Key_SEPARATOR;
+        break;
+    case VK_SUBTRACT:
+        return KeyboardKey::Key_SUBTRACT;
+        break;
+    case VK_DECIMAL:
+        return KeyboardKey::Key_DECIMAL;
+        break;
+    case VK_DIVIDE:
+        return KeyboardKey::Key_DIVIDE;
+        break;
+
+    case VK_LSHIFT:
+        return KeyboardKey::Key_LSHIFT;
+        break;
+    case VK_RSHIFT:
+        return KeyboardKey::Key_RSHIFT;
+        break;
+    case VK_LCONTROL:
+        return KeyboardKey::Key_LCONTROL;
+        break;
+    case VK_RCONTROL:
+        return KeyboardKey::Key_RCONTROL;
+        break;
+
+    default:
+        //This is to be expected, we are not handling all keys.
+        return KeyboardKey::Unknown;
+        break;
     }
 }
 
@@ -130,6 +405,13 @@ bool InputControllerWin32::HandleNativeMessage(const void* MsgData)
                 Key |= INPUT_KEY_STATE_FLAG_KEY_IS_DOWN;
             }
             MsgHandled = true;
+
+			//Record input for timed and repeated tracking
+            KeyboardKey keyboard_key = WindowsKeyToKeyboardKey((UINT)wParam);
+            if (keyboard_key != KeyboardKey::Unknown)
+            {
+                RecordKeyboardEvent(keyboard_key, KeyboardAction::Key_Down);
+            }
             break;
         }
 
@@ -145,6 +427,13 @@ bool InputControllerWin32::HandleNativeMessage(const void* MsgData)
                 Key |= INPUT_KEY_STATE_FLAG_KEY_WAS_DOWN;
             }
             MsgHandled = true;
+
+			//Record input for timed and repeated tracking
+            KeyboardKey keyboard_key = WindowsKeyToKeyboardKey((UINT)wParam);
+            if (keyboard_key != KeyboardKey::Unknown)
+            {
+                RecordKeyboardEvent(keyboard_key, KeyboardAction::Key_Up);
+            }
             break;
         }
 
@@ -261,6 +550,28 @@ void InputControllerWin32::UpdateMousePos()
         SetCursorPos( ptCenter.x, ptCenter.y );
         m_ptLastMousePosition = ptCenter;
     }*/
+}
+
+
+bool InputControllerWin32::RecordKeyboardEvent(KeyboardKey key, KeyboardAction action)
+{
+    if (action == KeyboardAction::Key_Up)
+    {
+        if (m_KeyboardKeys[static_cast<size_t>(key)] != KEYBOARD_STATE_FLAGS_KEY_UP)
+        {
+            m_KeyboardKeys[static_cast<size_t>(key)] = KEYBOARD_STATE_FLAGS_KEY_RISING;
+        }
+    }
+    else
+    {
+        if (m_KeyboardKeys[static_cast<size_t>(key)] != KEYBOARD_STATE_FLAGS_KEY_DOWN)
+        {
+            m_KeyboardKeys[static_cast<size_t>(key)] = KEYBOARD_STATE_FLAGS_KEY_FALLING;
+        }
+    }
+        
+    m_KeyboardKeyFramesRepeated[static_cast<size_t>(key)] = 0;
+    return true;
 }
 
 } // namespace Diligent

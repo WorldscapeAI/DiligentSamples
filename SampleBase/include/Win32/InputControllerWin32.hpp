@@ -39,6 +39,8 @@ public:
 
     const MouseState& GetMouseState();
 
+    bool RecordKeyboardEvent(KeyboardKey key, KeyboardAction action);
+
 private:
     void UpdateMousePos();
 };

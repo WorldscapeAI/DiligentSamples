@@ -39,6 +39,20 @@
 #include "AppBase.hpp"
 #include "FlagEnum.h"
 
+namespace Diligent  // NOLINT - name is okay - needs to match Diligent Engine
+{
+    namespace HLSL  // NOLINT - name is okay - needs to match Diligent Engine   
+    {
+
+#include "../../../DiligentFX/Shaders/Common/public/BasicStructures.fxh"
+#include "../../../DiligentFX/Shaders/PBR/public/PBR_Structures.fxh"
+#include "../../../DiligentFX/Shaders/PBR/private/RenderPBR_Structures.fxh"
+#include "../../../DiligentFX/Shaders/PostProcess/ToneMapping/public/ToneMappingStructures.fxh"
+#include "../../../DiligentFX/Shaders/PostProcess/ScreenSpaceReflection/public/ScreenSpaceReflectionStructures.fxh"
+
+    } // namespace HLSL
+}
+
 namespace Diligent
 {
 
@@ -190,13 +204,30 @@ public:
         m_pSwapChain = pNewSwapChain;
     }
 
-protected:
+    public:
     // Returns projection matrix adjusted to the current screen orientation
     float4x4 GetAdjustedProjectionMatrix(float FOV, float NearPlane, float FarPlane) const;
 
     // Returns pretransform matrix that matches the current screen rotation
     float4x4 GetSurfacePretransformMatrix(const float3& f3CameraViewAxis) const;
+    
+    Diligent::RefCntAutoPtr<Diligent::IEngineFactory>  getEngineFactory() { return m_pEngineFactory; }
+    Diligent::RefCntAutoPtr<Diligent::IRenderDevice>   getDevice() { return m_pDevice; }
+    Diligent::RefCntAutoPtr<Diligent::IDeviceContext>  getImmediateContext() { return m_pImmediateContext; }
+    std::vector<Diligent::RefCntAutoPtr<Diligent::IDeviceContext>> getDeferredContexts() { return m_pDeferredContexts; }
+    Diligent::RefCntAutoPtr<Diligent::ISwapChain> getSwapChain() { return m_pSwapChain; }
+    bool getConvertToGammaSpace() { return m_ConvertPSOutputToGamma; }
 
+    double getFOVRadians() { return m_fovRadians; }
+
+    uint32_t getAttributeOffset() { return m_CurrentFrameNumber & 0x01; }
+    
+    const HLSL::CameraAttribs& getCurrentCameraAttribs() { return m_CameraAttribs[getAttributeOffset()]; }
+    const Diligent::MouseState& getMouseState() { return m_mouseState; }
+    const int32_t getSelectedX() { return m_selectedX; }
+    const int32_t getSelectedY() { return m_selectedY; }
+
+    protected:
     RefCntAutoPtr<IEngineFactory>              m_pEngineFactory;
     RefCntAutoPtr<IRenderDevice>               m_pDevice;
     RefCntAutoPtr<IDeviceContext>              m_pImmediateContext;
@@ -208,11 +239,18 @@ protected:
     double m_LastFPSTime        = 0;
     Uint32 m_NumFramesRendered  = 0;
     Uint32 m_CurrentFrameNumber = 0;
+    float  m_fovRadians = 0;
 
     // Pixel shader output needs to be manually converted to gamma space
     bool m_ConvertPSOutputToGamma = false;
 
     InputController m_InputController;
+    Diligent::MouseState m_mouseState;
+
+    int32_t m_selectedX = -1;
+    int32_t m_selectedY = -1;
+
+    std::unique_ptr<Diligent::HLSL::CameraAttribs[]> m_CameraAttribs; // [0] - current frame, [1] - previous frame
 };
 
 inline void SampleBase::Update(double CurrTime, double ElapsedTime)
@@ -231,3 +269,5 @@ inline void SampleBase::Update(double CurrTime, double ElapsedTime)
 extern SampleBase* CreateSample();
 
 } // namespace Diligent
+
+extern Diligent::SampleBase* g_client;
