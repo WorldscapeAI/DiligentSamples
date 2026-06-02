@@ -256,6 +256,17 @@ public:
             }
         }
     }
+
+    void ResetKeyboardState()
+    {
+        for (int keyboardIdx = 0; keyboardIdx != static_cast<size_t>(KeyboardKey::TotalKeys); ++keyboardIdx)
+        {
+            m_KeyboardKeys[keyboardIdx]               = KEYBOARD_STATE_FLAGS::KEYBOARD_STATE_FLAGS_KEY_UP;
+            m_LastFrameKeyboardKeys[keyboardIdx]      = KEYBOARD_STATE_FLAGS::KEYBOARD_STATE_FLAGS_KEY_UP;
+            m_KeyboardKeyFramesRepeated[keyboardIdx]  = 0;
+            m_KeyboardKeyTimestampSwitch[keyboardIdx] = 0.0;
+        }
+    }
     
     void Update(const double current_time)
     {

@@ -171,6 +171,11 @@ public:
                     }
                 }
                 break;
+
+            case WM_SETFOCUS:
+            case WM_KILLFOCUS:
+                m_TheSample->GetInputController().ResetKeyboardState();
+                break;
         }
 
         if (m_pImGui)
