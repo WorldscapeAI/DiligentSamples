@@ -43,6 +43,9 @@ public:
 
 private:
     void UpdateMousePos();
+
+    void* m_hWnd = nullptr;
+    bool  m_bFocused = false;
 };
 
 } // namespace Diligent
