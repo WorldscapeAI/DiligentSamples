@@ -388,10 +388,33 @@ bool InputControllerWin32::HandleNativeMessage(const void* MsgData)
     auto wParam = WndMsg.wParam;
     auto lParam = WndMsg.lParam;
 
-
     bool MsgHandled = false;
     switch (uMsg)
     {
+        case WM_SETFOCUS:
+        {
+            m_hWnd = hWnd;
+            m_bFocused = true;
+            m_MouseState.PosX = -1;
+            m_MouseState.PosY = -1;
+            m_MouseState.ButtonFlags = MouseState::BUTTON_FLAG_NONE;
+            UpdateMousePos();
+            break;
+        }
+
+        case WM_KILLFOCUS:
+        {
+            if (m_hWnd == hWnd)
+            {
+                m_hWnd = nullptr;
+                m_bFocused = false;
+                m_MouseState.PosX = -1;
+                m_MouseState.PosY = -1;
+                m_MouseState.ButtonFlags = MouseState::BUTTON_FLAG_NONE;
+            }
+            break;
+        }
+
         case WM_KEYDOWN:
         {
             // Map this key to a InputKeys enum and update the
@@ -526,9 +549,16 @@ bool InputControllerWin32::HandleNativeMessage(const void* MsgData)
 
 void InputControllerWin32::UpdateMousePos()
 {
-    POINT MousePosition;
-    GetCursorPos(&MousePosition);
-    ScreenToClient(GetActiveWindow(), &MousePosition);
+    if (m_hWnd == nullptr || !m_bFocused)
+        return;
+
+    POINT MousePosition{};
+    if (!GetCursorPos(&MousePosition))
+        return;
+
+    if(!ScreenToClient(static_cast<HWND>(m_hWnd), &MousePosition))
+        return;
+
     m_MouseState.PosX = static_cast<float>(MousePosition.x);
     m_MouseState.PosY = static_cast<float>(MousePosition.y);
 
